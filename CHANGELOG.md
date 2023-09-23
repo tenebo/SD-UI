@@ -83,10 +83,10 @@
 - add a custom UI element that combines accordion and checkbox
 - avoid importing gradio in tests because it spams warnings
 - put infotext label for setting into OptionInfo definition rather than in a separate list
-- make `StableDiffusionProcessingImg2Img.mask_blur` a property, make more inline with PIL `GaussianBlur` ([#12470](https://github.com/tenebo/standard-demo-we/pull/12470))
+- make `StandardDemoProcessingImg2Img.mask_blur` a property, make more inline with PIL `GaussianBlur` ([#12470](https://github.com/tenebo/standard-demo-we/pull/12470))
 - option to make scripts UI without gr.Group
 - add a way for scripts to register a callback for before/after just a single component's creation
-- use dataclass for StableDiffusionProcessing
+- use dataclass for StandardDemoProcessing
 - store patches for Lora in a specialized module instead of inside torch
 - support http/https URLs in API ([#12663](https://github.com/tenebo/standard-demo-we/pull/12663), [#12698](https://github.com/tenebo/standard-demo-we/pull/12698))
 - add extra noise callback ([#12616](https://github.com/tenebo/standard-demo-we/pull/12616))

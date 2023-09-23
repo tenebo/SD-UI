@@ -87,7 +87,7 @@ A browser interface based on Gradio library for Standard Demo.
 - API
 - Support for dedicated [inpainting model](https://github.com/runwayml/stable-diffusion#inpainting-with-stable-diffusion) by RunwayML
 - via extension: [Aesthetic Gradients](https://github.com/tenebo/standard-demo-we-aesthetic-gradients), a way to generate images with a specific aesthetic by using clip images embeds (implementation of [https://github.com/vicgalle/stable-diffusion-aesthetic-gradients](https://github.com/vicgalle/stable-diffusion-aesthetic-gradients))
-- [Standard Demo 2.0](https://github.com/Stability-AI/stablediffusion) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#stable-diffusion-20) for instructions
+- [Standard Demo 2.0](https://github.com/Stability-AI/standarddemo) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#stable-diffusion-20) for instructions
 - [Alt-Diffusion](https://arxiv.org/abs/2211.06679) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#alt-diffusion) for instructions
 - Now without any bad letters!
 - Load checkpoints in safetensors format
