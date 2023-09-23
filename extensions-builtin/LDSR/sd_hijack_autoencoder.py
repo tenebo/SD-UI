@@ -1,5 +1,5 @@
 # The content of this file comes from the ldm/models/autoencoder.py file of the compvis/standard-demo repo
-# The VQModel & VQModelInterface were subsequently removed from ldm/models/autoencoder.py when we moved to the stability-ai/standarddemo repo
+# The VQModel & VQModelInterface were subsequently removed from ldm/models/autoencoder.py when we moved to the tenebo/standarddemo repo
 # As the LDSR upscaler relies on VQModel & VQModelInterface, the hijack aims to put them back into the ldm.models.autoencoder
 import numpy as np
 import torch
