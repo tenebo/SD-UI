@@ -1,5 +1,5 @@
 """
-Tiny AutoEncoder for Stable Diffusion
+Tiny AutoEncoder for Standard Demo
 (DNN for encoding / decoding SD's latent space)
 
 https://github.com/madebyollin/taesd
