@@ -5,7 +5,7 @@ import torch
 from modules import shared, paths, sd_disable_initialization, devices
 
 sd_configs_path = shared.sd_configs_path
-sd_repo_configs_path = os.path.join(paths.paths['Standard Demo'], "configs", "stable-diffusion")
+sd_repo_configs_path = os.path.join(paths.paths['Standard Demo'], "configs", "standard-demo")
 sd_xl_repo_configs_path = os.path.join(paths.paths['Standard Demo XL'], "configs", "inference")
 
 

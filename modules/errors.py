@@ -61,7 +61,7 @@ def display(e: Exception, task, *, full_traceback=False):
     if "copying a param with shape torch.Size([640, 1024]) from checkpoint, the shape in current model is torch.Size([640, 768])" in message:
         print_error_explanation("""
 The most likely cause of this is you are trying to load Standard Demo 2.0 model without specifying its config file.
-See https://github.com/tenebo/standard-demo-we/wiki/Features#stable-diffusion-20 for how to solve this.
+See https://github.com/tenebo/standard-demo-we/wiki/Features#standard-demo-20 for how to solve this.
         """)
 
 

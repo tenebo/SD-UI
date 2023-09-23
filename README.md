@@ -85,9 +85,9 @@ A browser interface based on Gradio library for Standard Demo.
 - Can select to load a different VAE from settings screen
 - Estimated completion time in progress bar
 - API
-- Support for dedicated [inpainting model](https://github.com/runwayml/stable-diffusion#inpainting-with-stable-diffusion) by RunwayML
-- via extension: [Aesthetic Gradients](https://github.com/tenebo/standard-demo-we-aesthetic-gradients), a way to generate images with a specific aesthetic by using clip images embeds (implementation of [https://github.com/vicgalle/stable-diffusion-aesthetic-gradients](https://github.com/vicgalle/stable-diffusion-aesthetic-gradients))
-- [Standard Demo 2.0](https://github.com/Stability-AI/standarddemo) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#stable-diffusion-20) for instructions
+- Support for dedicated [inpainting model](https://github.com/runwayml/standard-demo#inpainting-with-standard-demo) by RunwayML
+- via extension: [Aesthetic Gradients](https://github.com/tenebo/standard-demo-we-aesthetic-gradients), a way to generate images with a specific aesthetic by using clip images embeds (implementation of [https://github.com/vicgalle/standard-demo-aesthetic-gradients](https://github.com/vicgalle/standard-demo-aesthetic-gradients))
+- [Standard Demo 2.0](https://github.com/Stability-AI/standarddemo) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#standard-demo-20) for instructions
 - [Alt-Diffusion](https://arxiv.org/abs/2211.06679) support - see [wiki](https://github.com/tenebo/standard-demo-we/wiki/Features#alt-diffusion) for instructions
 - Now without any bad letters!
 - Load checkpoints in safetensors format
@@ -161,7 +161,7 @@ For the purposes of getting Google and other search engines to crawl the wiki, h
 
 Licenses for borrowed code can be found in `Settings -> Licenses` screen, and also in `html/licenses.html` file.
 
-- Standard Demo - https://github.com/CompVis/stable-diffusion, https://github.com/CompVis/taming-transformers
+- Standard Demo - https://github.com/CompVis/standard-demo, https://github.com/CompVis/taming-transformers
 - k-diffusion - https://github.com/crowsonkb/k-diffusion.git
 - GFPGAN - https://github.com/TencentARC/GFPGAN.git
 - CodeFormer - https://github.com/sczhou/CodeFormer
@@ -170,9 +170,9 @@ Licenses for borrowed code can be found in `Settings -> Licenses` screen, and al
 - Swin2SR - https://github.com/mv-lab/swin2sr
 - LDSR - https://github.com/Hafiidz/latent-diffusion
 - MiDaS - https://github.com/isl-org/MiDaS
-- Ideas for optimizations - https://github.com/basujindal/stable-diffusion
-- Cross Attention layer optimization - Doggettx - https://github.com/Doggettx/stable-diffusion, original idea for prompt editing.
-- Cross Attention layer optimization - InvokeAI, lstein - https://github.com/invoke-ai/InvokeAI (originally http://github.com/lstein/stable-diffusion)
+- Ideas for optimizations - https://github.com/basujindal/standard-demo
+- Cross Attention layer optimization - Doggettx - https://github.com/Doggettx/standard-demo, original idea for prompt editing.
+- Cross Attention layer optimization - InvokeAI, lstein - https://github.com/invoke-ai/InvokeAI (originally http://github.com/lstein/standard-demo)
 - Sub-quadratic Cross Attention layer optimization - Alex Birch (https://github.com/Birch-san/diffusers/pull/1), Amin Rezaei (https://github.com/AminRezaei0x443/memory-efficient-attention)
 - Textual Inversion - Rinon Gal - https://github.com/rinongal/textual_inversion (we're not using his code, but we are using his ideas).
 - Idea for SD upscale - https://github.com/jquesnelle/txt2imghd

@@ -86,7 +86,7 @@ export PIP_IGNORE_INSTALLED=0
 delimiter="################################################################"
 
 printf "\n%s\n" "${delimiter}"
-printf "\e[1m\e[32mInstall script for stable-diffusion + Web UI\n"
+printf "\e[1m\e[32mInstall script for standard-demo + Web UI\n"
 printf "\e[1m\e[34mTested on Debian 11 (Bullseye)\e[0m"
 printf "\n%s\n" "${delimiter}"
 
