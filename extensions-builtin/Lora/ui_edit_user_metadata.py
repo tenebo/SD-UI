@@ -27,16 +27,16 @@ class LoraUserMetadataEditor(ui_extra_networks_user_metadata.UserMetadataEditor)
 	def __init__(A,ui,tabname,page):super().__init__(ui,tabname,page);A.select_sd_version=_A;A.taginfo=_A;A.edit_activation_text=_A;A.slider_preferred_weight=_A;A.edit_notes=_A
 	def save_lora_user_metadata(B,name,desc,sd_version,activation_text,preferred_weight,notes):A=B.get_user_metadata(name);A['description']=desc;A['sd version']=sd_version;A[_G]=activation_text;A[_H]=preferred_weight;A['notes']=notes;B.write_user_metadata(name,A)
 	def get_metadata_table(M,name):
-		L='buckets';A=super().get_metadata_table(name);N=M.page.items.get(name,{});D=N.get(_E)or{};O={'ss_output_name':'Output name:','ss_sd_model_name':'Model:','ss_clip_skip':'Clip skip:','ss_network_module':'Kohya module:'}
+		J='buckets';A=super().get_metadata_table(name);N=M.page.items.get(name,{});D=N.get(_E)or{};O={'ss_output_name':'Output name:','ss_sd_model_name':'Model:','ss_clip_skip':'Clip skip:','ss_network_module':'Kohya module:'}
 		for(P,Q)in O.items():
 			F=D.get(P,_A)
 			if F is not _A and str(F)!='None':A.append((Q,html.escape(F)))
-		J=D.get('ss_training_started_at')
-		if J:A.append(('Date trained:',datetime.datetime.utcfromtimestamp(float(J)).strftime('%Y-%m-%d %H:%M')))
+		K=D.get('ss_training_started_at')
+		if K:A.append(('Date trained:',datetime.datetime.utcfromtimestamp(float(K)).strftime('%Y-%m-%d %H:%M')))
 		G=D.get('ss_bucket_info')
-		if G and L in G:
+		if G and J in G:
 			B={}
-			for(R,K)in G[L].items():C=K['resolution'];C=f"{C[1]}x{C[0]}";B[C]=B.get(C,0)+int(K['count'])
+			for(R,L)in G[J].items():C=L['resolution'];C=f"{C[1]}x{C[0]}";B[C]=B.get(C,0)+int(L['count'])
 			H=sorted(B.keys(),key=B.get,reverse=_B);E=html.escape(_D.join(H[0:4]))
 			if len(B)>4:E+=', ...';E=f"<span title='{html.escape(_D.join(H))}'>{E}</span>"
 			A.append(('Resolutions:'if len(H)>1 else'Resolution:',E))

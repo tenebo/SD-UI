@@ -18,21 +18,21 @@ def get_crop_region(mask,pad=0):
 		I+=1
 	return int(max(F-C,0)),int(max(H-C,0)),int(min(E-G+C,E)),int(min(D-I+C,D))
 def expand_crop_region(crop_region,processing_width,processing_height,image_width,image_height):
-	'expands crop region get_crop_region() to match the ratio of the image the region will processed in; returns expanded region\n    for example, if user drew mask in a 128x32 region, and the dimensions for processing are 512x512, the region will be expanded to 128x128.';G=image_height;F=image_width;C,D,A,B=crop_region;K=(A-C)/(B-D);H=processing_width/processing_height
+	'expands crop region get_crop_region() to match the ratio of the image the region will processed in; returns expanded region\n    for example, if user drew mask in a 128x32 region, and the dimensions for processing are 512x512, the region will be expanded to 128x128.';F=image_height;G=image_width;C,D,A,B=crop_region;K=(A-C)/(B-D);H=processing_width/processing_height
 	if K>H:
 		L=(A-C)/H;I=int(L-(B-D));D-=I//2;B+=I-I//2
-		if B>=G:E=B-G;B-=E;D-=E
+		if B>=F:E=B-F;B-=E;D-=E
 		if D<0:B-=D;D-=D
-		if B>=G:B=G
+		if B>=F:B=F
 	else:
 		M=(B-D)*H;J=int(M-(A-C));C-=J//2;A+=J-J//2
-		if A>=F:E=A-F;A-=E;C-=E
+		if A>=G:E=A-G;A-=E;C-=E
 		if C<0:A-=C;C-=C
-		if A>=F:A=F
+		if A>=G:A=G
 	return C,D,A,B
 def fill(image,mask):
-	'fills masked regions with colors from image using blur. Not extremely effective.';D='RGBa';C='RGBA';A=image;E=Image.new(C,(A.width,A.height));B=Image.new(D,(A.width,A.height));B.paste(A.convert(C).convert(D),mask=ImageOps.invert(mask.convert('L')));B=B.convert(D)
+	'fills masked regions with colors from image using blur. Not extremely effective.';C='RGBa';D='RGBA';A=image;E=Image.new(D,(A.width,A.height));B=Image.new(C,(A.width,A.height));B.paste(A.convert(D).convert(C),mask=ImageOps.invert(mask.convert('L')));B=B.convert(C)
 	for(F,G)in[(256,1),(64,1),(16,2),(4,4),(2,2),(0,1)]:
-		H=B.filter(ImageFilter.GaussianBlur(F)).convert(C)
+		H=B.filter(ImageFilter.GaussianBlur(F)).convert(D)
 		for I in range(G):E.alpha_composite(H)
 	return E.convert('RGB')

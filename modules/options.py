@@ -64,16 +64,16 @@ class Options:
 		if x is _A or y is _A:return _C
 		B=A.typemap.get(type(x),type(x));C=A.typemap.get(type(y),type(y));return B==C
 	def load(A,filename):
-		L='ui_reorder_list';K='quicksettings_list';J='quicksettings';I='sd_vae_overrides_per_model_preferences';H='sd_vae_as_default';E=filename;D='ui_reorder'
-		with open(E,'r',encoding='utf8')as M:A.data=json.load(M)
-		if A.data.get(H)is not _A and A.data.get(I)is _A:A.data[I]=not A.data.get(H)
-		if A.data.get(J)is not _A and A.data.get(K)is _A:A.data[K]=[A.strip()for A in A.data.get(J).split(',')]
-		if isinstance(A.data.get(D),str)and A.data.get(D)and L not in A.data:A.data[L]=[A.strip()for A in A.data.get(D).split(',')]
-		F=0
-		for(G,B)in A.data.items():
-			C=A.data_labels.get(G,_A)
-			if C is not _A and not A.same_type(C.default,B):print(f"Warning: bad setting value: {G}: {B} ({type(B).__name__}; expected {type(C.default).__name__})",file=sys.stderr);F+=1
-		if F>0:print(f"The program is likely to not work with bad settings.\nSettings file: {E}\nEither fix the file, or delete it and restart.",file=sys.stderr)
+		E='ui_reorder_list';F='quicksettings_list';G='quicksettings';H='sd_vae_overrides_per_model_preferences';I='sd_vae_as_default';J=filename;B='ui_reorder'
+		with open(J,'r',encoding='utf8')as M:A.data=json.load(M)
+		if A.data.get(I)is not _A and A.data.get(H)is _A:A.data[H]=not A.data.get(I)
+		if A.data.get(G)is not _A and A.data.get(F)is _A:A.data[F]=[A.strip()for A in A.data.get(G).split(',')]
+		if isinstance(A.data.get(B),str)and A.data.get(B)and E not in A.data:A.data[E]=[A.strip()for A in A.data.get(B).split(',')]
+		K=0
+		for(L,C)in A.data.items():
+			D=A.data_labels.get(L,_A)
+			if D is not _A and not A.same_type(D.default,C):print(f"Warning: bad setting value: {L}: {C} ({type(C).__name__}; expected {type(D.default).__name__})",file=sys.stderr);K+=1
+		if K>0:print(f"The program is likely to not work with bad settings.\nSettings file: {J}\nEither fix the file, or delete it and restart.",file=sys.stderr)
 	def onchange(A,key,func,call=_C):
 		B=A.data_labels.get(key);B.onchange=func
 		if call:func()

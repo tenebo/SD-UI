@@ -36,7 +36,7 @@ def get_single_card(page='',tabname='',name=''):
 	try:B=A.create_item(C,enable_filter=_B);A.items[C]=B
 	except Exception as E:errors.display(E,'creating item for extra network');B=A.items.get(C)
 	A.read_user_metadata(B);F=A.create_html_for_item(B,tabname);return D({'html':F})
-def add_pages_to_demo(app):B='GET';A=app;A.add_api_route('/sd_extra_networks/thumb',fetch_file,methods=[B]);A.add_api_route('/sd_extra_networks/metadata',get_metadata,methods=[B]);A.add_api_route('/sd_extra_networks/get-single-card',get_single_card,methods=[B])
+def add_pages_to_demo(app):A='GET';B=app;B.add_api_route('/sd_extra_networks/thumb',fetch_file,methods=[A]);B.add_api_route('/sd_extra_networks/metadata',get_metadata,methods=[A]);B.add_api_route('/sd_extra_networks/get-single-card',get_single_card,methods=[A])
 def quote_js(s):s=s.replace(_E,'\\\\');s=s.replace('"','\\"');return f'"{s}"'
 class ExtraNetworksPage:
 	def __init__(A,title):B=title;A.title=B;A.name=B.lower();A.id_page=A.name.replace(' ','_');A.card_page=shared.html('extra-networks-card.html');A.allow_negative_prompt=_B;A.metadata={};A.items={}
@@ -85,18 +85,18 @@ class ExtraNetworksPage:
 	def list_items(A):raise NotImplementedError()
 	def allowed_directories_for_previews(A):return[]
 	def create_html_for_item(B,item,tabname):
-		'\n        Create HTML for card item in tab tabname; can return empty string if the item is not meant to be shown.\n        ';N='search_term';M='sort_keys';H='local_preview';G='prompt';C=tabname;A=item;I=A.get('preview',_A);D=A.get('onclick',_A)
-		if D is _A:D='"'+html.escape(f"return cardClicked({quote_js(C)}, {A[G]}, {'true'if B.allow_negative_prompt else'false'})")+'"'
-		O=f"height: {shared.opts.extra_networks_card_height}px;"if shared.opts.extra_networks_card_height else'';P=f"width: {shared.opts.extra_networks_card_width}px;"if shared.opts.extra_networks_card_width else'';Q=f'<img src="{html.escape(I)}" class="preview" loading="lazy">'if I else'';J='';R=A.get(_G)
-		if R:J=f"<div class='metadata-button card-button' title='Show internal metadata' onclick='extraNetworksRequestMetadata(event, {quote_js(B.name)}, {quote_js(A[_C])})'></div>"
-		S=f"<div class='edit-button card-button' title='Edit metadata' onclick='extraNetworksEditUserMetadata(event, {quote_js(C)}, {quote_js(B.id_page)}, {quote_js(A[_C])})'></div>";E='';K=A.get(_H,'')
+		'\n        Create HTML for card item in tab tabname; can return empty string if the item is not meant to be shown.\n        ';I='search_term';J='sort_keys';D='local_preview';E='prompt';C=tabname;A=item;K=A.get('preview',_A);F=A.get('onclick',_A)
+		if F is _A:F='"'+html.escape(f"return cardClicked({quote_js(C)}, {A[E]}, {'true'if B.allow_negative_prompt else'false'})")+'"'
+		O=f"height: {shared.opts.extra_networks_card_height}px;"if shared.opts.extra_networks_card_height else'';P=f"width: {shared.opts.extra_networks_card_width}px;"if shared.opts.extra_networks_card_width else'';Q=f'<img src="{html.escape(K)}" class="preview" loading="lazy">'if K else'';L='';R=A.get(_G)
+		if R:L=f"<div class='metadata-button card-button' title='Show internal metadata' onclick='extraNetworksRequestMetadata(event, {quote_js(B.name)}, {quote_js(A[_C])})'></div>"
+		S=f"<div class='edit-button card-button' title='Edit metadata' onclick='extraNetworksEditUserMetadata(event, {quote_js(C)}, {quote_js(B.id_page)}, {quote_js(A[_C])})'></div>";G='';M=A.get(_H,'')
 		for T in B.allowed_directories_for_previews():
-			L=os.path.abspath(T)
-			if K.startswith(L):E=K[len(L):]
-		if shared.opts.extra_networks_hidden_models=='Always':F=_B
-		else:F='/.'in E or'\\.'in E
-		if F and shared.opts.extra_networks_hidden_models=='Never':return''
-		U=' '.join([html.escape(f"data-sort-{A}={B}")for(A,B)in A.get(M,{}).items()]).strip();V={'background_image':Q,'style':f"'display: none; {O}{P}; font-size: {shared.opts.extra_networks_card_text_scale*100}%'",G:A.get(G,_A),'tabname':quote_js(C),H:quote_js(A[H]),_C:html.escape(A[_C]),_F:A.get(_F)or''if shared.opts.extra_networks_card_show_desc else'','card_clicked':D,'save_card_preview':'"'+html.escape(f"return saveCardPreview(event, {quote_js(C)}, {quote_js(A[H])})")+'"',N:A.get(N,''),'metadata_button':J,'edit_button':S,'search_only':' search_only'if F else'',M:U};return B.card_page.format(**V)
+			N=os.path.abspath(T)
+			if M.startswith(N):G=M[len(N):]
+		if shared.opts.extra_networks_hidden_models=='Always':H=_B
+		else:H='/.'in G or'\\.'in G
+		if H and shared.opts.extra_networks_hidden_models=='Never':return''
+		U=' '.join([html.escape(f"data-sort-{A}={B}")for(A,B)in A.get(J,{}).items()]).strip();V={'background_image':Q,'style':f"'display: none; {O}{P}; font-size: {shared.opts.extra_networks_card_text_scale*100}%'",E:A.get(E,_A),'tabname':quote_js(C),D:quote_js(A[D]),_C:html.escape(A[_C]),_F:A.get(_F)or''if shared.opts.extra_networks_card_show_desc else'','card_clicked':F,'save_card_preview':'"'+html.escape(f"return saveCardPreview(event, {quote_js(C)}, {quote_js(A[D])})")+'"',I:A.get(I,''),'metadata_button':L,'edit_button':S,'search_only':' search_only'if H else'',J:U};return B.card_page.format(**V)
 	def get_sort_keys(C,path):'\n        List of default keys used for sorting in the UI.\n        ';A=Path(path);B=A.stat();return{'date_created':int(B.st_ctime or 0),'date_modified':int(B.st_mtime or 0),_C:A.name.lower()}
 	def find_preview(C,path):
 		'\n        Find a preview PNG for a given path (without extension) and call link_preview on it.\n        ';A=['png','jpg','jpeg','webp']
@@ -124,20 +124,20 @@ def pages_in_preferred_order(pages):
 		return len(A)
 	D={A.name:(B(A.name),C)for(C,A)in enumerate(A)};return sorted(A,key=lambda x:D[x.name])
 def create_ui(interface,unrelated_tabs,tabname):
-	N='Default Sort';B=tabname;from modules.ui import switch_values_symbol as O;A=ExtraNetworksUi();A.pages=[];A.pages_contents=[];A.user_metadata_editors=[];A.stored_extra_pages=pages_in_preferred_order(extra_pages.copy());A.tabname=B;F=[]
+	F='Default Sort';B=tabname;from modules.ui import switch_values_symbol as O;A=ExtraNetworksUi();A.pages=[];A.pages_contents=[];A.user_metadata_editors=[];A.stored_extra_pages=pages_in_preferred_order(extra_pages.copy());A.tabname=B;G=[]
 	for D in A.stored_extra_pages:
-		with gr.Tab(D.title,id=D.id_page)as C:P=f"{B}_{D.id_page}_cards_html";G=gr.HTML('Loading...',elem_id=P);A.pages.append(G);G.change(fn=lambda:_A,_js='function(){applyExtraNetworkFilter('+quote_js(B)+'); return []}',inputs=[],outputs=[]);H=D.create_user_metadata_editor(A,B);H.create_ui();A.user_metadata_editors.append(H);F.append(C)
-	I=gr.Textbox('',show_label=_B,elem_id=B+'_extra_search',elem_classes='search',placeholder='Search...',visible=_B,interactive=_D);J=gr.Dropdown(choices=[N,'Date Created','Date Modified','Name'],value=N,elem_id=B+'_extra_sort',elem_classes='sort',multiselect=_B,visible=_B,show_label=_B,interactive=_D,label=B+'_extra_sort_order');K=ToolButton(O,elem_id=B+'_extra_sortorder',elem_classes='sortorder',visible=_B);E=gr.Button('Refresh',elem_id=B+'_extra_refresh',visible=_B);L=gr.Checkbox(_D,label='Show dirs',elem_id=B+'_extra_show_dirs',elem_classes='show-dirs',visible=_B);A.button_save_preview=gr.Button('Save preview',elem_id=B+'_save_preview',visible=_B);A.preview_target_filename=gr.Textbox('Preview save filename',elem_id=B+'_preview_filename',visible=_B)
-	for C in unrelated_tabs:C.select(fn=lambda:[gr.update(visible=_B)for A in range(5)],inputs=[],outputs=[I,J,K,E,L],show_progress=_B)
-	for C in F:C.select(fn=lambda:[gr.update(visible=_D)for A in range(5)],inputs=[],outputs=[I,J,K,E,L],show_progress=_B)
+		with gr.Tab(D.title,id=D.id_page)as C:P=f"{B}_{D.id_page}_cards_html";H=gr.HTML('Loading...',elem_id=P);A.pages.append(H);H.change(fn=lambda:_A,_js='function(){applyExtraNetworkFilter('+quote_js(B)+'); return []}',inputs=[],outputs=[]);I=D.create_user_metadata_editor(A,B);I.create_ui();A.user_metadata_editors.append(I);G.append(C)
+	J=gr.Textbox('',show_label=_B,elem_id=B+'_extra_search',elem_classes='search',placeholder='Search...',visible=_B,interactive=_D);K=gr.Dropdown(choices=[F,'Date Created','Date Modified','Name'],value=F,elem_id=B+'_extra_sort',elem_classes='sort',multiselect=_B,visible=_B,show_label=_B,interactive=_D,label=B+'_extra_sort_order');L=ToolButton(O,elem_id=B+'_extra_sortorder',elem_classes='sortorder',visible=_B);E=gr.Button('Refresh',elem_id=B+'_extra_refresh',visible=_B);M=gr.Checkbox(_D,label='Show dirs',elem_id=B+'_extra_show_dirs',elem_classes='show-dirs',visible=_B);A.button_save_preview=gr.Button('Save preview',elem_id=B+'_save_preview',visible=_B);A.preview_target_filename=gr.Textbox('Preview save filename',elem_id=B+'_preview_filename',visible=_B)
+	for C in unrelated_tabs:C.select(fn=lambda:[gr.update(visible=_B)for A in range(5)],inputs=[],outputs=[J,K,L,E,M],show_progress=_B)
+	for C in G:C.select(fn=lambda:[gr.update(visible=_D)for A in range(5)],inputs=[],outputs=[J,K,L,E,M],show_progress=_B)
 	def Q():
-		if not A.pages_contents:return M()
+		if not A.pages_contents:return N()
 		return A.pages_contents
-	def M():
+	def N():
 		for B in A.stored_extra_pages:B.refresh()
 		A.pages_contents=[B.create_html(A.tabname)for B in A.stored_extra_pages];return A.pages_contents
-	interface.load(fn=Q,inputs=[],outputs=[*A.pages]);E.click(fn=M,inputs=[],outputs=A.pages);return A
-def path_is_parent(parent_path,child_path):B=child_path;A=parent_path;A=os.path.abspath(A);B=os.path.abspath(B);return B.startswith(A)
+	interface.load(fn=Q,inputs=[],outputs=[*A.pages]);E.click(fn=N,inputs=[],outputs=A.pages);return A
+def path_is_parent(parent_path,child_path):A=child_path;B=parent_path;B=os.path.abspath(B);A=os.path.abspath(A);return A.startswith(B)
 def setup_ui(ui,gallery):
 	B=gallery;A=ui
 	def C(index,images,filename):

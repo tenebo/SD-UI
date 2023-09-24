@@ -100,11 +100,11 @@ def transform_checkpoint_dict_key(k):
 		if k.startswith(A):k=B+k[len(A):]
 	return k
 def get_state_dict_from_checkpoint(pl_sd):
-	D='state_dict';A=pl_sd;A=A.pop(D,A);A.pop(D,_A);B={}
+	B='state_dict';A=pl_sd;A=A.pop(B,A);A.pop(B,_A);C={}
 	for(E,F)in A.items():
-		C=transform_checkpoint_dict_key(E)
-		if C is not _A:B[C]=F
-	A.clear();A.update(B);return A
+		D=transform_checkpoint_dict_key(E)
+		if D is not _A:C[D]=F
+	A.clear();A.update(C);return A
 def read_metadata_from_safetensors(filename):
 	E=filename;import json as F
 	with open(E,mode='rb')as C:
@@ -116,13 +116,13 @@ def read_metadata_from_safetensors(filename):
 				except Exception:pass
 		return D
 def read_state_dict(checkpoint_file,print_global_state=_B,map_location=_A):
-	E='global_step';C=map_location;B=checkpoint_file;H,F=os.path.splitext(B)
+	C='global_step';D=map_location;B=checkpoint_file;H,F=os.path.splitext(B)
 	if F.lower()==_D:
-		D=C or shared.weight_load_location or devices.get_optimal_device_name()
-		if not shared.opts.disable_mmap_load_safetensors:A=safetensors.torch.load_file(B,device=D)
-		else:A=safetensors.torch.load(open(B,'rb').read());A={A:B.to(D)for(A,B)in A.items()}
-	else:A=torch.load(B,map_location=C or shared.weight_load_location)
-	if print_global_state and E in A:print(f"Global Step: {A[E]}")
+		E=D or shared.weight_load_location or devices.get_optimal_device_name()
+		if not shared.opts.disable_mmap_load_safetensors:A=safetensors.torch.load_file(B,device=E)
+		else:A=safetensors.torch.load(open(B,'rb').read());A={A:B.to(E)for(A,B)in A.items()}
+	else:A=torch.load(B,map_location=D or shared.weight_load_location)
+	if print_global_state and C in A:print(f"Global Step: {A[C]}")
 	G=get_state_dict_from_checkpoint(A);return G
 def get_checkpoint_state_dict(checkpoint_info,timer):
 	B=timer;A=checkpoint_info;C=A.calculate_shorthash();B.record(_F)
@@ -133,28 +133,28 @@ class SkipWritingToConfig:
 	def __enter__(A):A.previous=SkipWritingToConfig.skip;SkipWritingToConfig.skip=_C;return A
 	def __exit__(A,exc_type,exc_value,exc_traceback):SkipWritingToConfig.skip=A.previous
 def load_model_weights(model,checkpoint_info,state_dict,timer):
-	D=state_dict;C=timer;B=checkpoint_info;A=model;F=B.calculate_shorthash();C.record(_F)
-	if not SkipWritingToConfig.skip:shared.opts.data[_E]=B.title
-	if D is _A:D=get_checkpoint_state_dict(B,C)
+	D=state_dict;B=timer;C=checkpoint_info;A=model;F=C.calculate_shorthash();B.record(_F)
+	if not SkipWritingToConfig.skip:shared.opts.data[_E]=C.title
+	if D is _A:D=get_checkpoint_state_dict(C,B)
 	A.is_sdxl=hasattr(A,_G);A.is_sd2=not A.is_sdxl and hasattr(A.cond_stage_model,'model');A.is_sd1=not A.is_sdxl and not A.is_sd2
 	if A.is_sdxl:sd_models_xl.extend_sdxl(A)
-	A.load_state_dict(D,strict=_B);C.record('apply weights to model')
-	if shared.opts.sd_checkpoint_cache>0:checkpoints_loaded[B]=D
+	A.load_state_dict(D,strict=_B);B.record('apply weights to model')
+	if shared.opts.sd_checkpoint_cache>0:checkpoints_loaded[C]=D
 	del D
-	if shared.cmd_opts.opt_channelslast:A.to(memory_format=torch.channels_last);C.record('apply channels_last')
-	if shared.cmd_opts.no_half:A.float();devices.dtype_unet=torch.float32;C.record('apply float()')
+	if shared.cmd_opts.opt_channelslast:A.to(memory_format=torch.channels_last);B.record('apply channels_last')
+	if shared.cmd_opts.no_half:A.float();devices.dtype_unet=torch.float32;B.record('apply float()')
 	else:
 		G=A.first_stage_model;E=getattr(A,'depth_model',_A)
 		if shared.cmd_opts.no_half_vae:A.first_stage_model=_A
 		if shared.cmd_opts.upcast_sampling and E:A.depth_model=_A
 		A.half();A.first_stage_model=G
 		if E:A.depth_model=E
-		devices.dtype_unet=torch.float16;C.record('apply half()')
-	devices.unet_needs_upcast=shared.cmd_opts.upcast_sampling and devices.dtype==torch.float16 and devices.dtype_unet==torch.float16;A.first_stage_model.to(devices.dtype_vae);C.record('apply dtype to VAE')
+		devices.dtype_unet=torch.float16;B.record('apply half()')
+	devices.unet_needs_upcast=shared.cmd_opts.upcast_sampling and devices.dtype==torch.float16 and devices.dtype_unet==torch.float16;A.first_stage_model.to(devices.dtype_vae);B.record('apply dtype to VAE')
 	while len(checkpoints_loaded)>shared.opts.sd_checkpoint_cache:checkpoints_loaded.popitem(last=_B)
-	A.sd_model_hash=F;A.sd_model_checkpoint=B.filename;A.sd_checkpoint_info=B;shared.opts.data[_H]=B.sha256
+	A.sd_model_hash=F;A.sd_model_checkpoint=C.filename;A.sd_checkpoint_info=C;shared.opts.data[_H]=C.sha256
 	if hasattr(A,'logvar'):A.logvar=A.logvar.to(devices.device)
-	sd_vae.delete_base_vae();sd_vae.clear_loaded_vae();H,I=sd_vae.resolve_vae(B.filename).tuple();sd_vae.load_vae(A,H,I);C.record('load VAE')
+	sd_vae.delete_base_vae();sd_vae.clear_loaded_vae();H,I=sd_vae.resolve_vae(C.filename).tuple();sd_vae.load_vae(A,H,I);B.record('load VAE')
 def enable_midas_autodownload():
 	'\n    Gives the ldm.modules.midas.api.load_model function automatic downloading.\n\n    When the 512-depth-ema model, and other future models like it, is loaded,\n    it calls midas.api.load_model to load the associated midas depth model.\n    This function applies a wrapper to download the model to the correct\n    location automatically.\n    ';B=os.path.join(paths.models_path,'midas')
 	for(A,C)in midas.api.ISL_PATHS.items():D=os.path.basename(C);midas.api.ISL_PATHS[A]=os.path.join(B,D)
@@ -232,18 +232,18 @@ def load_model(checkpoint_info=_A,already_loaded_state_dict=_A):
 	with devices.autocast(),torch.no_grad():A.cond_stage_model_empty_prompt=get_empty_cond(A)
 	B.record('calculate empty prompt');print(f"Model loaded in {B.summary()}.");return A
 def reuse_model_from_already_loaded(sd_model,checkpoint_info,timer):
-	"\n    Checks if the desired checkpoint from checkpoint_info is not already loaded in model_data.loaded_sd_models.\n    If it is loaded, returns that (moving it to GPU if necessary, and moving the currently loadded model to CPU if necessary).\n    If not, returns the model that can be used to load weights from checkpoint_info's file.\n    If no such model exists, returns None.\n    Additionaly deletes loaded models that are over the limit set in settings (sd_checkpoints_limit).\n    ";D=timer;C=checkpoint_info;A=sd_model;B=_A
+	"\n    Checks if the desired checkpoint from checkpoint_info is not already loaded in model_data.loaded_sd_models.\n    If it is loaded, returns that (moving it to GPU if necessary, and moving the currently loadded model to CPU if necessary).\n    If not, returns the model that can be used to load weights from checkpoint_info's file.\n    If no such model exists, returns None.\n    Additionaly deletes loaded models that are over the limit set in settings (sd_checkpoints_limit).\n    ";C=timer;D=checkpoint_info;A=sd_model;B=_A
 	for F in reversed(range(len(model_data.loaded_sd_models))):
 		E=model_data.loaded_sd_models[F]
-		if E.sd_checkpoint_info.filename==C.filename:B=E;continue
-		if len(model_data.loaded_sd_models)>shared.opts.sd_checkpoints_limit>0:print(f"Unloading model {len(model_data.loaded_sd_models)} over the limit of {shared.opts.sd_checkpoints_limit}: {E.sd_checkpoint_info.title}");model_data.loaded_sd_models.pop();send_model_to_trash(E);D.record('send model to trash')
-		if shared.opts.sd_checkpoints_keep_in_cpu:send_model_to_cpu(A);D.record('send model to cpu')
+		if E.sd_checkpoint_info.filename==D.filename:B=E;continue
+		if len(model_data.loaded_sd_models)>shared.opts.sd_checkpoints_limit>0:print(f"Unloading model {len(model_data.loaded_sd_models)} over the limit of {shared.opts.sd_checkpoints_limit}: {E.sd_checkpoint_info.title}");model_data.loaded_sd_models.pop();send_model_to_trash(E);C.record('send model to trash')
+		if shared.opts.sd_checkpoints_keep_in_cpu:send_model_to_cpu(A);C.record('send model to cpu')
 	if B is not _A:
-		send_model_to_device(B);D.record('send model to device');model_data.set_sd_model(B,already_loaded=_C)
+		send_model_to_device(B);C.record('send model to device');model_data.set_sd_model(B,already_loaded=_C)
 		if not SkipWritingToConfig.skip:shared.opts.data[_E]=B.sd_checkpoint_info.title;shared.opts.data[_H]=B.sd_checkpoint_info.sha256
-		print(f"Using already loaded model {B.sd_checkpoint_info.title}: done in {D.summary()}");sd_vae.reload_vae_weights(B);return model_data.sd_model
-	elif shared.opts.sd_checkpoints_limit>1 and len(model_data.loaded_sd_models)<shared.opts.sd_checkpoints_limit:print(f"Loading model {C.title} ({len(model_data.loaded_sd_models)+1} out of {shared.opts.sd_checkpoints_limit})");model_data.sd_model=_A;load_model(C);return model_data.sd_model
-	elif len(model_data.loaded_sd_models)>0:A=model_data.loaded_sd_models.pop();model_data.sd_model=A;sd_vae.base_vae=getattr(A,_I,_A);sd_vae.loaded_vae_file=getattr(A,_J,_A);sd_vae.checkpoint_info=A.sd_checkpoint_info;print(f"Reusing loaded model {A.sd_checkpoint_info.title} to load {C.title}");return A
+		print(f"Using already loaded model {B.sd_checkpoint_info.title}: done in {C.summary()}");sd_vae.reload_vae_weights(B);return model_data.sd_model
+	elif shared.opts.sd_checkpoints_limit>1 and len(model_data.loaded_sd_models)<shared.opts.sd_checkpoints_limit:print(f"Loading model {D.title} ({len(model_data.loaded_sd_models)+1} out of {shared.opts.sd_checkpoints_limit})");model_data.sd_model=_A;load_model(D);return model_data.sd_model
+	elif len(model_data.loaded_sd_models)>0:A=model_data.loaded_sd_models.pop();model_data.sd_model=A;sd_vae.base_vae=getattr(A,_I,_A);sd_vae.loaded_vae_file=getattr(A,_J,_A);sd_vae.checkpoint_info=A.sd_checkpoint_info;print(f"Reusing loaded model {A.sd_checkpoint_info.title} to load {D.title}");return A
 	else:return
 def reload_model_weights(sd_model=_A,info=_A):
 	A=sd_model;C=info or select_checkpoint();B=Timer()
@@ -270,8 +270,8 @@ def unload_model_weights(sd_model=_A,info=_A):
 	if model_data.sd_model:model_data.sd_model.to(devices.cpu);sd_hijack.model_hijack.undo_hijack(model_data.sd_model);model_data.sd_model=_A;A=_A;gc.collect();devices.torch_gc()
 	print(f"Unloaded weights {B.summary()}.");return A
 def apply_token_merging(sd_model,token_merging_ratio):
-	'\n    Applies speed and memory optimizations from tomesd.\n    ';B=token_merging_ratio;A=sd_model;C=getattr(A,'applied_token_merged_ratio',0)
-	if C==B:return
-	if C>0:tomesd.remove_patch(A)
-	if B>0:tomesd.apply_patch(A,ratio=B,use_rand=_B,merge_attn=_C,merge_crossattn=_B,merge_mlp=_B)
-	A.applied_token_merged_ratio=B
+	'\n    Applies speed and memory optimizations from tomesd.\n    ';A=token_merging_ratio;B=sd_model;C=getattr(B,'applied_token_merged_ratio',0)
+	if C==A:return
+	if C>0:tomesd.remove_patch(B)
+	if A>0:tomesd.apply_patch(B,ratio=A,use_rand=_B,merge_attn=_C,merge_crossattn=_B,merge_mlp=_B)
+	B.applied_token_merged_ratio=A

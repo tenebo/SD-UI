@@ -56,21 +56,21 @@ def disabled_train(self,mode=_C):'Overwrite model.train with this function to ma
 def uniform_on_device(r1,r2,shape,device):return(r1-r2)*torch.rand(*shape,device=device)+r2
 class DDPM(pl.LightningModule):
 	def __init__(A,unet_config,timesteps=1000,beta_schedule=_Q,loss_type='l2',ckpt_path=_A,ignore_keys=_A,load_only_unet=_B,monitor='val/loss',use_ema=_C,first_stage_key=_R,image_size=256,channels=3,log_every_t=100,clip_denoised=_C,linear_start=.0001,linear_end=.02,cosine_s=.008,given_betas=_A,original_elbo_weight=_E,v_posterior=_E,l_simple_weight=_D,conditioning_key=_A,parameterization=_G,scheduler_config=_A,use_positional_encodings=_B,learn_logvar=_B,logvar_init=_E,load_ema=_C):
-		F=load_ema;E=scheduler_config;D=parameterization;C=monitor;B=ckpt_path;super().__init__();assert D in[_G,_I],'currently only supporting "eps" and "x0"';A.parameterization=D;print(f"{A.__class__.__name__}: Running in {A.parameterization}-prediction mode");A.cond_stage_model=_A;A.clip_denoised=clip_denoised;A.log_every_t=log_every_t;A.first_stage_key=first_stage_key;A.image_size=image_size;A.channels=channels;A.use_positional_encodings=use_positional_encodings;A.model=DiffusionWrapper(unet_config,conditioning_key);count_params(A.model,verbose=_C);A.use_ema=use_ema;A.use_scheduler=E is not _A
-		if A.use_scheduler:A.scheduler_config=E
+		B=load_ema;C=scheduler_config;D=parameterization;E=monitor;F=ckpt_path;super().__init__();assert D in[_G,_I],'currently only supporting "eps" and "x0"';A.parameterization=D;print(f"{A.__class__.__name__}: Running in {A.parameterization}-prediction mode");A.cond_stage_model=_A;A.clip_denoised=clip_denoised;A.log_every_t=log_every_t;A.first_stage_key=first_stage_key;A.image_size=image_size;A.channels=channels;A.use_positional_encodings=use_positional_encodings;A.model=DiffusionWrapper(unet_config,conditioning_key);count_params(A.model,verbose=_C);A.use_ema=use_ema;A.use_scheduler=C is not _A
+		if A.use_scheduler:A.scheduler_config=C
 		A.v_posterior=v_posterior;A.original_elbo_weight=original_elbo_weight;A.l_simple_weight=l_simple_weight
-		if C is not _A:A.monitor=C
-		if A.use_ema and F:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
-		if B is not _A:
-			A.init_from_ckpt(B,ignore_keys=ignore_keys or[],only_model=load_only_unet)
-			if A.use_ema and not F:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
+		if E is not _A:A.monitor=E
+		if A.use_ema and B:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
+		if F is not _A:
+			A.init_from_ckpt(F,ignore_keys=ignore_keys or[],only_model=load_only_unet)
+			if A.use_ema and not B:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
 		A.register_schedule(given_betas=given_betas,beta_schedule=beta_schedule,timesteps=timesteps,linear_start=linear_start,linear_end=linear_end,cosine_s=cosine_s);A.loss_type=loss_type;A.learn_logvar=learn_logvar;A.logvar=torch.full(fill_value=logvar_init,size=(A.num_timesteps,))
 		if A.learn_logvar:A.logvar=nn.Parameter(A.logvar,requires_grad=_C)
 	def register_schedule(A,given_betas=_A,beta_schedule=_Q,timesteps=1000,linear_start=.0001,linear_end=.02,cosine_s=.008):
-		K=linear_end;J=linear_start;I=given_betas;G=timesteps
-		if exists(I):D=I
-		else:D=make_beta_schedule(beta_schedule,G,linear_start=J,linear_end=K,cosine_s=cosine_s)
-		H=_D-D;B=np.cumprod(H,axis=0);E=np.append(_D,B[:-1]);G,=D.shape;A.num_timesteps=int(G);A.linear_start=J;A.linear_end=K;assert B.shape[0]==A.num_timesteps,'alphas have to be defined for each timestep';C=partial(torch.tensor,dtype=torch.float32);A.register_buffer('betas',C(D));A.register_buffer('alphas_cumprod',C(B));A.register_buffer('alphas_cumprod_prev',C(E));A.register_buffer('sqrt_alphas_cumprod',C(np.sqrt(B)));A.register_buffer('sqrt_one_minus_alphas_cumprod',C(np.sqrt(_D-B)));A.register_buffer('log_one_minus_alphas_cumprod',C(np.log(_D-B)));A.register_buffer('sqrt_recip_alphas_cumprod',C(np.sqrt(_D/B)));A.register_buffer('sqrt_recipm1_alphas_cumprod',C(np.sqrt(_D/B-1)));L=(1-A.v_posterior)*D*(_D-E)/(_D-B)+A.v_posterior*D;A.register_buffer('posterior_variance',C(L));A.register_buffer('posterior_log_variance_clipped',C(np.log(np.maximum(L,1e-20))));A.register_buffer('posterior_mean_coef1',C(D*np.sqrt(E)/(_D-B)));A.register_buffer('posterior_mean_coef2',C((_D-E)*np.sqrt(H)/(_D-B)))
+		I=linear_end;J=linear_start;K=given_betas;G=timesteps
+		if exists(K):D=K
+		else:D=make_beta_schedule(beta_schedule,G,linear_start=J,linear_end=I,cosine_s=cosine_s)
+		H=_D-D;B=np.cumprod(H,axis=0);E=np.append(_D,B[:-1]);G,=D.shape;A.num_timesteps=int(G);A.linear_start=J;A.linear_end=I;assert B.shape[0]==A.num_timesteps,'alphas have to be defined for each timestep';C=partial(torch.tensor,dtype=torch.float32);A.register_buffer('betas',C(D));A.register_buffer('alphas_cumprod',C(B));A.register_buffer('alphas_cumprod_prev',C(E));A.register_buffer('sqrt_alphas_cumprod',C(np.sqrt(B)));A.register_buffer('sqrt_one_minus_alphas_cumprod',C(np.sqrt(_D-B)));A.register_buffer('log_one_minus_alphas_cumprod',C(np.log(_D-B)));A.register_buffer('sqrt_recip_alphas_cumprod',C(np.sqrt(_D/B)));A.register_buffer('sqrt_recipm1_alphas_cumprod',C(np.sqrt(_D/B-1)));L=(1-A.v_posterior)*D*(_D-E)/(_D-B)+A.v_posterior*D;A.register_buffer('posterior_variance',C(L));A.register_buffer('posterior_log_variance_clipped',C(np.log(np.maximum(L,1e-20))));A.register_buffer('posterior_mean_coef1',C(D*np.sqrt(E)/(_D-B)));A.register_buffer('posterior_mean_coef2',C((_D-E)*np.sqrt(H)/(_D-B)))
 		if A.parameterization==_G:F=A.betas**2/(2*A.posterior_variance*C(H)*(1-A.alphas_cumprod))
 		elif A.parameterization==_I:F=.5*np.sqrt(torch.Tensor(B))/(2.*1-torch.Tensor(B))
 		else:raise NotImplementedError('mu not supported')
@@ -87,12 +87,12 @@ class DDPM(pl.LightningModule):
 				A.model_ema.restore(A.model.parameters())
 				if B is not _A:print(f"{B}: Restored training weights")
 	def init_from_ckpt(D,path,ignore_keys=_A,only_model=_B):
-		J='state_dict';C=ignore_keys;C=C or[];A=torch.load(path,map_location='cpu')
-		if J in list(A.keys()):A=A[J]
-		K=list(A.keys());L=['model.diffusion_model.input_blocks.0.0.weight','model_ema.diffusion_modelinput_blocks00weight'];I=D.state_dict()
+		I='state_dict';C=ignore_keys;C=C or[];A=torch.load(path,map_location='cpu')
+		if I in list(A.keys()):A=A[I]
+		K=list(A.keys());L=['model.diffusion_model.input_blocks.0.0.weight','model_ema.diffusion_modelinput_blocks00weight'];J=D.state_dict()
 		for B in L:
-			if B not in A or B not in I:continue
-			E=I[B]
+			if B not in A or B not in J:continue
+			E=J[B]
 			if E.size()!=A[B].size():print(f"Manual init: {B}");E.zero_();E[:,:4,:,:].copy_(A[B]);C.append(B)
 		for F in K:
 			for M in C:
@@ -123,13 +123,13 @@ class DDPM(pl.LightningModule):
 	def sample(self,batch_size=16,return_intermediates=_B):A=self;B=A.image_size;C=A.channels;return A.p_sample_loop((batch_size,C,B,B),return_intermediates=return_intermediates)
 	def q_sample(C,x_start,t,noise=_A):B=noise;A=x_start;B=default(B,lambda:torch.randn_like(A));return extract_into_tensor(C.sqrt_alphas_cumprod,t,A.shape)*A+extract_into_tensor(C.sqrt_one_minus_alphas_cumprod,t,A.shape)*B
 	def get_loss(D,pred,target,mean=_C):
-		C=target;B=pred
+		B=target;C=pred
 		if D.loss_type=='l1':
-			A=(C-B).abs()
+			A=(B-C).abs()
 			if mean:A=A.mean()
 		elif D.loss_type=='l2':
-			if mean:A=torch.nn.functional.mse_loss(C,B)
-			else:A=torch.nn.functional.mse_loss(C,B,reduction='none')
+			if mean:A=torch.nn.functional.mse_loss(B,C)
+			else:A=torch.nn.functional.mse_loss(B,C,reduction='none')
 		else:raise NotImplementedError("unknown loss type '{loss_type}'")
 		return A
 	def p_losses(A,x_start,t,noise=_A):
@@ -172,19 +172,19 @@ class DDPM(pl.LightningModule):
 		D=torch.optim.AdamW(B,lr=C);return D
 class LatentDiffusion(DDPM):
 	'main class'
-	def __init__(A,first_stage_config,cond_stage_config,num_timesteps_cond=_A,cond_stage_key=_R,cond_stage_trainable=_B,concat_mode=_C,cond_stage_forward=_A,conditioning_key=_A,scale_factor=_D,scale_by_std=_B,load_ema=_C,*K,**C):
-		I=load_ema;H=scale_by_std;G=scale_factor;F=concat_mode;E=cond_stage_config;D=first_stage_config;B=conditioning_key;A.num_timesteps_cond=default(num_timesteps_cond,1);A.scale_by_std=H;assert A.num_timesteps_cond<=C['timesteps']
-		if B is _A:B=_J if F else _K
-		if E==_V:B=_A
-		J=C.pop('ckpt_path',_A);L=C.pop('ignore_keys',[]);super().__init__(*K,conditioning_key=B,load_ema=I,**C);A.concat_mode=F;A.cond_stage_trainable=cond_stage_trainable;A.cond_stage_key=cond_stage_key
-		try:A.num_downs=len(D.params.ddconfig.ch_mult)-1
+	def __init__(A,first_stage_config,cond_stage_config,num_timesteps_cond=_A,cond_stage_key=_R,cond_stage_trainable=_B,concat_mode=_C,cond_stage_forward=_A,conditioning_key=_A,scale_factor=_D,scale_by_std=_B,load_ema=_C,*K,**B):
+		D=load_ema;E=scale_by_std;F=scale_factor;G=concat_mode;H=cond_stage_config;I=first_stage_config;C=conditioning_key;A.num_timesteps_cond=default(num_timesteps_cond,1);A.scale_by_std=E;assert A.num_timesteps_cond<=B['timesteps']
+		if C is _A:C=_J if G else _K
+		if H==_V:C=_A
+		J=B.pop('ckpt_path',_A);L=B.pop('ignore_keys',[]);super().__init__(*K,conditioning_key=C,load_ema=D,**B);A.concat_mode=G;A.cond_stage_trainable=cond_stage_trainable;A.cond_stage_key=cond_stage_key
+		try:A.num_downs=len(I.params.ddconfig.ch_mult)-1
 		except Exception:A.num_downs=0
-		if not H:A.scale_factor=G
-		else:A.register_buffer(_i,torch.tensor(G))
-		A.instantiate_first_stage(D);A.instantiate_cond_stage(E);A.cond_stage_forward=cond_stage_forward;A.clip_denoised=_B;A.bbox_tokenizer=_A;A.restarted_from_ckpt=_B
+		if not E:A.scale_factor=F
+		else:A.register_buffer(_i,torch.tensor(F))
+		A.instantiate_first_stage(I);A.instantiate_cond_stage(H);A.cond_stage_forward=cond_stage_forward;A.clip_denoised=_B;A.bbox_tokenizer=_A;A.restarted_from_ckpt=_B
 		if J is not _A:
 			A.init_from_ckpt(J,L);A.restarted_from_ckpt=_C
-			if A.use_ema and not I:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
+			if A.use_ema and not D:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
 	def make_cond_schedule(A):A.cond_ids=torch.full(size=(A.num_timesteps,),fill_value=A.num_timesteps-1,dtype=torch.long);B=torch.round(torch.linspace(0,A.num_timesteps-1,A.num_timesteps_cond)).long();A.cond_ids[:A.num_timesteps_cond]=B
 	@rank_zero_only
 	@torch.no_grad()
@@ -231,19 +231,19 @@ class LatentDiffusion(DDPM):
 		if A.split_input_params['tie_braker']:C=A.delta_border(Ly,Lx);C=torch.clip(C,A.split_input_params['clip_min_tie_weight'],A.split_input_params['clip_max_tie_weight']);C=C.view(1,1,Ly*Lx).to(D);B=B*C
 		return B
 	def get_fold_unfold(L,x,kernel_size,stride,uf=1,df=1):
-		'\n        :param x: img of size (bs, c, h, w)\n        :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])\n        ';E=stride;C=df;B=uf;A=kernel_size;P,Q,J,K=x.shape;F=(J-A[0])//E[0]+1;G=(K-A[1])//E[1]+1
-		if B==1 and C==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);I=torch.nn.Fold(output_size=x.shape[2:],**H);D=L.get_weighting(A[0],A[1],F,G,x.device).to(x.dtype);N=I(D).view(1,1,J,K);D=D.view((1,1,A[0],A[1],F*G))
-		elif B>1 and C==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]*B,A[0]*B),dilation=1,padding=0,stride=(E[0]*B,E[1]*B));I=torch.nn.Fold(output_size=(x.shape[2]*B,x.shape[3]*B),**O);D=L.get_weighting(A[0]*B,A[1]*B,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J*B,K*B);D=D.view((1,1,A[0]*B,A[1]*B,F*G))
-		elif C>1 and B==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]//C,A[0]//C),dilation=1,padding=0,stride=(E[0]//C,E[1]//C));I=torch.nn.Fold(output_size=(x.shape[2]//C,x.shape[3]//C),**O);D=L.get_weighting(A[0]//C,A[1]//C,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J//C,K//C);D=D.view((1,1,A[0]//C,A[1]//C,F*G))
+		'\n        :param x: img of size (bs, c, h, w)\n        :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])\n        ';E=stride;B=df;C=uf;A=kernel_size;P,Q,J,K=x.shape;F=(J-A[0])//E[0]+1;G=(K-A[1])//E[1]+1
+		if C==1 and B==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);I=torch.nn.Fold(output_size=x.shape[2:],**H);D=L.get_weighting(A[0],A[1],F,G,x.device).to(x.dtype);N=I(D).view(1,1,J,K);D=D.view((1,1,A[0],A[1],F*G))
+		elif C>1 and B==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]*C,A[0]*C),dilation=1,padding=0,stride=(E[0]*C,E[1]*C));I=torch.nn.Fold(output_size=(x.shape[2]*C,x.shape[3]*C),**O);D=L.get_weighting(A[0]*C,A[1]*C,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J*C,K*C);D=D.view((1,1,A[0]*C,A[1]*C,F*G))
+		elif B>1 and C==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]//B,A[0]//B),dilation=1,padding=0,stride=(E[0]//B,E[1]//B));I=torch.nn.Fold(output_size=(x.shape[2]//B,x.shape[3]//B),**O);D=L.get_weighting(A[0]//B,A[1]//B,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J//B,K//B);D=D.view((1,1,A[0]//B,A[1]//B,F*G))
 		else:raise NotImplementedError
 		return I,M,N,D
 	@torch.no_grad()
 	def get_input(self,batch,k,return_first_stage_outputs=_B,force_c_encode=_B,cond_key=_A,return_original_cond=_B,bs=_A,uncond=.05):
-		J=batch;F=uncond;E=cond_key;D=bs;A=self;B=super().get_input(J,k)
+		J=batch;E=uncond;F=cond_key;D=bs;A=self;B=super().get_input(J,k)
 		if D is not _A:B=B[:D]
-		B=B.to(A.device);L=A.encode_first_stage(B);K=A.get_first_stage_encoding(L).detach();E=E or A.cond_stage_key;C=super().get_input(J,E)
+		B=B.to(A.device);L=A.encode_first_stage(B);K=A.get_first_stage_encoding(L).detach();F=F or A.cond_stage_key;C=super().get_input(J,F)
 		if D is not _A:C[_F]=C[_F][:D];C[_H]=C[_H][:D]
-		G={};H=torch.rand(B.size(0),device=B.device);M=rearrange(H<2*F,'n -> n 1 1');N=1-rearrange((H>=F).float()*(H<3*F).float(),'n -> n 1 1 1');O=A.get_learned_conditioning(['']);G[_F]=[torch.where(M,O,A.get_learned_conditioning(C[_F]).detach())];G[_H]=[N*A.encode_first_stage(C[_H].to(A.device)).mode().detach()];I=[K,G]
+		G={};H=torch.rand(B.size(0),device=B.device);M=rearrange(H<2*E,'n -> n 1 1');N=1-rearrange((H>=E).float()*(H<3*E).float(),'n -> n 1 1 1');O=A.get_learned_conditioning(['']);G[_F]=[torch.where(M,O,A.get_learned_conditioning(C[_F]).detach())];G[_H]=[N*A.encode_first_stage(C[_H].to(A.device)).mode().detach()];I=[K,G]
 		if return_first_stage_outputs:P=A.decode_first_stage(K);I.extend([B,P])
 		if return_original_cond:I.append(C)
 		return I
@@ -345,20 +345,20 @@ class LatentDiffusion(DDPM):
 		else:return E,F,G
 	@torch.no_grad()
 	def p_sample(self,x,c,t,clip_denoised=_B,repeat_noise=_B,return_codebook_ids=_B,quantize_denoised=_B,return_x0=_B,temperature=_D,noise_dropout=_E,score_corrector=_A,corrector_kwargs=_A):
-		I=noise_dropout;E=return_x0;D=return_codebook_ids;J,*F,K=*x.shape,x.device;G=self.p_mean_variance(x=x,c=c,t=t,clip_denoised=clip_denoised,return_codebook_ids=D,quantize_denoised=quantize_denoised,return_x0=E,score_corrector=score_corrector,corrector_kwargs=corrector_kwargs)
-		if D:raise DeprecationWarning('Support dropped.');A,F,B,L=G
-		elif E:A,F,B,M=G
+		I=noise_dropout;D=return_x0;E=return_codebook_ids;J,*F,K=*x.shape,x.device;G=self.p_mean_variance(x=x,c=c,t=t,clip_denoised=clip_denoised,return_codebook_ids=E,quantize_denoised=quantize_denoised,return_x0=D,score_corrector=score_corrector,corrector_kwargs=corrector_kwargs)
+		if E:raise DeprecationWarning('Support dropped.');A,F,B,L=G
+		elif D:A,F,B,M=G
 		else:A,F,B=G
 		C=noise_like(x.shape,K,repeat_noise)*temperature
 		if I>_E:C=torch.nn.functional.dropout(C,p=I)
 		H=(1-(t==0).float()).reshape(J,*(1,)*(len(x.shape)-1))
-		if D:return A+H*(.5*B).exp()*C,L.argmax(dim=1)
-		if E:return A+H*(.5*B).exp()*C,M
+		if E:return A+H*(.5*B).exp()*C,L.argmax(dim=1)
+		if D:return A+H*(.5*B).exp()*C,M
 		else:return A+H*(.5*B).exp()*C
 	@torch.no_grad()
 	def progressive_denoising(self,cond,shape,verbose=_C,callback=_A,quantize_denoised=_B,img_callback=_A,mask=_A,x0=_A,temperature=_D,noise_dropout=_E,score_corrector=_A,corrector_kwargs=_A,batch_size=_A,x_T=_A,start_T=_A,log_every_t=_A):
-		N=start_T;M=img_callback;L=callback;J=log_every_t;I=mask;H=temperature;G=shape;C=batch_size;B=self;A=cond
-		if not J:J=B.log_every_t
+		L=start_T;M=img_callback;N=callback;I=log_every_t;J=mask;H=temperature;G=shape;C=batch_size;B=self;A=cond
+		if not I:I=B.log_every_t
 		D=B.num_timesteps
 		if C is not _A:O=C if C is not _A else G[0];G=[C]+list(G)
 		else:O=C=G[0]
@@ -368,38 +368,38 @@ class LatentDiffusion(DDPM):
 		if A is not _A:
 			if isinstance(A,dict):A={B:A[B][:C]if not isinstance(A[B],list)else[A[:C]for A in A[B]]for B in A}
 			else:A=[A[:C]for A in A]if isinstance(A,list)else A[:C]
-		if N is not _A:D=min(D,N)
+		if L is not _A:D=min(D,L)
 		Q=tqdm(reversed(range(0,D)),desc=_l,total=D)if verbose else reversed(range(0,D))
 		if type(H)==float:H=[H]*D
 		for F in Q:
 			K=torch.full((O,),F,device=B.device,dtype=torch.long)
 			if B.shorten_cond_schedule:assert B.model.conditioning_key!=_O;R=B.cond_ids[K].to(A.device);A=B.q_sample(x_start=A,t=R,noise=torch.randn_like(A))
 			E,S=B.p_sample(E,A,K,clip_denoised=B.clip_denoised,quantize_denoised=quantize_denoised,return_x0=_C,temperature=H[F],noise_dropout=noise_dropout,score_corrector=score_corrector,corrector_kwargs=corrector_kwargs)
-			if I is not _A:assert x0 is not _A;T=B.q_sample(x0,K);E=T*I+(_D-I)*E
-			if F%J==0 or F==D-1:P.append(S)
-			if L:L(F)
+			if J is not _A:assert x0 is not _A;T=B.q_sample(x0,K);E=T*J+(_D-J)*E
+			if F%I==0 or F==D-1:P.append(S)
+			if N:N(F)
 			if M:M(E,F)
 		return E,P
 	@torch.no_grad()
 	def p_sample_loop(self,cond,shape,return_intermediates=_B,x_T=_A,verbose=_C,callback=_A,timesteps=_A,quantize_denoised=_B,mask=_A,x0=_A,img_callback=_A,start_T=_A,log_every_t=_A):
-		L=start_T;K=img_callback;J=callback;I=shape;G=log_every_t;E=mask;D=cond;C=timesteps;A=self
+		I=start_T;J=img_callback;K=callback;L=shape;G=log_every_t;D=mask;E=cond;C=timesteps;A=self
 		if not G:G=A.log_every_t
-		M=A.betas.device;O=I[0]
-		if x_T is _A:B=torch.randn(I,device=M)
+		M=A.betas.device;O=L[0]
+		if x_T is _A:B=torch.randn(L,device=M)
 		else:B=x_T
 		N=[B]
 		if C is _A:C=A.num_timesteps
-		if L is not _A:C=min(C,L)
+		if I is not _A:C=min(C,I)
 		P=tqdm(reversed(range(0,C)),desc=_b,total=C)if verbose else reversed(range(0,C))
-		if E is not _A:assert x0 is not _A;assert x0.shape[2:3]==E.shape[2:3]
+		if D is not _A:assert x0 is not _A;assert x0.shape[2:3]==D.shape[2:3]
 		for F in P:
 			H=torch.full((O,),F,device=M,dtype=torch.long)
-			if A.shorten_cond_schedule:assert A.model.conditioning_key!=_O;Q=A.cond_ids[H].to(D.device);D=A.q_sample(x_start=D,t=Q,noise=torch.randn_like(D))
-			B=A.p_sample(B,D,H,clip_denoised=A.clip_denoised,quantize_denoised=quantize_denoised)
-			if E is not _A:R=A.q_sample(x0,H);B=R*E+(_D-E)*B
+			if A.shorten_cond_schedule:assert A.model.conditioning_key!=_O;Q=A.cond_ids[H].to(E.device);E=A.q_sample(x_start=E,t=Q,noise=torch.randn_like(E))
+			B=A.p_sample(B,E,H,clip_denoised=A.clip_denoised,quantize_denoised=quantize_denoised)
+			if D is not _A:R=A.q_sample(x0,H);B=R*D+(_D-D)*B
 			if F%G==0 or F==C-1:N.append(B)
-			if J:J(F)
-			if K:K(B,F)
+			if K:K(F)
+			if J:J(B,F)
 		if return_intermediates:return B,N
 		return B
 	@torch.no_grad()
@@ -411,44 +411,44 @@ class LatentDiffusion(DDPM):
 			else:A=[A[:B]for A in A]if isinstance(A,list)else A[:B]
 		return C.p_sample_loop(A,D,return_intermediates=return_intermediates,x_T=x_T,verbose=verbose,timesteps=timesteps,quantize_denoised=quantize_denoised,mask=mask,x0=x0)
 	@torch.no_grad()
-	def sample_log(self,cond,batch_size,ddim,ddim_steps,**C):
-		B=batch_size;A=self
-		if ddim:F=DDIMSampler(A);G=A.channels,A.image_size,A.image_size;D,E=F.sample(ddim_steps,B,G,cond,verbose=_B,**C)
-		else:D,E=A.sample(cond=cond,batch_size=B,return_intermediates=_C,**C)
+	def sample_log(self,cond,batch_size,ddim,ddim_steps,**B):
+		C=batch_size;A=self
+		if ddim:F=DDIMSampler(A);G=A.channels,A.image_size,A.image_size;D,E=F.sample(ddim_steps,C,G,cond,verbose=_B,**B)
+		else:D,E=A.sample(cond=cond,batch_size=C,return_intermediates=_C,**B)
 		return D,E
 	@torch.no_grad()
 	def log_images(self,batch,N=4,n_row=4,sample=_C,ddim_steps=200,ddim_eta=_D,return_keys=_A,quantize_denoised=_C,inpaint=_B,plot_denoise_rows=_B,plot_progressive_rows=_B,plot_diffusion_rows=_B,**g):
-		Y='caption';T=return_keys;S=batch;R='conditioning';P=ddim_eta;O=ddim_steps;M=n_row;A=self;Q=_B;B={};J,H,D,Z,C=A.get_input(S,A.first_stage_key,return_first_stage_outputs=_C,force_c_encode=_C,return_original_cond=_C,bs=N,uncond=0);N=min(D.shape[0],N);M=min(D.shape[0],M);B[_c]=D;B['reals']=C[_H];B['reconstruction']=Z
+		W='caption';S=return_keys;T=batch;M='conditioning';O=ddim_eta;P=ddim_steps;Q=n_row;A=self;R=_B;B={};J,H,D,Z,C=A.get_input(T,A.first_stage_key,return_first_stage_outputs=_C,force_c_encode=_C,return_original_cond=_C,bs=N,uncond=0);N=min(D.shape[0],N);Q=min(D.shape[0],Q);B[_c]=D;B['reals']=C[_H];B['reconstruction']=Z
 		if A.model.conditioning_key is not _A:
-			if hasattr(A.cond_stage_model,'decode'):C=A.cond_stage_model.decode(H);B[R]=C
-			elif A.cond_stage_key in[Y]:C=log_txt_as_img((D.shape[2],D.shape[3]),S[Y]);B[R]=C
-			elif A.cond_stage_key=='class_label':C=log_txt_as_img((D.shape[2],D.shape[3]),S['human_label']);B[R]=C
-			elif isimage(C):B[R]=C
+			if hasattr(A.cond_stage_model,'decode'):C=A.cond_stage_model.decode(H);B[M]=C
+			elif A.cond_stage_key in[W]:C=log_txt_as_img((D.shape[2],D.shape[3]),T[W]);B[M]=C
+			elif A.cond_stage_key=='class_label':C=log_txt_as_img((D.shape[2],D.shape[3]),T['human_label']);B[M]=C
+			elif isimage(C):B[M]=C
 			if ismap(C):B['original_conditioning']=A.to_rgb(C)
 		if plot_diffusion_rows:
-			K=[];W=J[:M]
+			K=[];X=J[:Q]
 			for E in range(A.num_timesteps):
-				if E%A.log_every_t==0 or E==A.num_timesteps-1:E=repeat(torch.tensor([E]),_d,b=M);E=E.to(A.device).long();a=torch.randn_like(W);b=A.q_sample(x_start=W,t=E,noise=a);K.append(A.decode_first_stage(b))
+				if E%A.log_every_t==0 or E==A.num_timesteps-1:E=repeat(torch.tensor([E]),_d,b=Q);E=E.to(A.device).long();a=torch.randn_like(X);b=A.q_sample(x_start=X,t=E,noise=a);K.append(A.decode_first_stage(b))
 			K=torch.stack(K);L=rearrange(K,_T);L=rearrange(L,_U);L=make_grid(L,nrow=K.shape[0]);B[_e]=L
 		if sample:
-			with A.ema_scope(_f):F,X=A.sample_log(cond=H,batch_size=N,ddim=Q,ddim_steps=O,eta=P)
+			with A.ema_scope(_f):F,Y=A.sample_log(cond=H,batch_size=N,ddim=R,ddim_steps=P,eta=O)
 			G=A.decode_first_stage(F);B[_g]=G
-			if plot_denoise_rows:c=A._get_denoise_row_from_list(X);B[_h]=c
+			if plot_denoise_rows:c=A._get_denoise_row_from_list(Y);B[_h]=c
 			if quantize_denoised and not isinstance(A.first_stage_model,AutoencoderKL)and not isinstance(A.first_stage_model,IdentityFirstStage):
-				with A.ema_scope('Plotting Quantized Denoised'):F,X=A.sample_log(cond=H,batch_size=N,ddim=Q,ddim_steps=O,eta=P,quantize_denoised=_C)
+				with A.ema_scope('Plotting Quantized Denoised'):F,Y=A.sample_log(cond=H,batch_size=N,ddim=R,ddim_steps=P,eta=O,quantize_denoised=_C)
 				G=A.decode_first_stage(F.to(A.device));B['samples_x0_quantized']=G
 			if inpaint:
 				U,V=J.shape[2],J.shape[3];I=torch.ones(N,U,V).to(A.device);I[:,U//4:3*U//4,V//4:3*V//4]=_E;I=I[:,_A,...]
-				with A.ema_scope('Plotting Inpaint'):F,d=A.sample_log(cond=H,batch_size=N,ddim=Q,eta=P,ddim_steps=O,x0=J[:N],mask=I)
+				with A.ema_scope('Plotting Inpaint'):F,d=A.sample_log(cond=H,batch_size=N,ddim=R,eta=O,ddim_steps=P,x0=J[:N],mask=I)
 				G=A.decode_first_stage(F.to(A.device));B['samples_inpainting']=G;B['mask']=I
-				with A.ema_scope('Plotting Outpaint'):F,d=A.sample_log(cond=H,batch_size=N,ddim=Q,eta=P,ddim_steps=O,x0=J[:N],mask=I)
+				with A.ema_scope('Plotting Outpaint'):F,d=A.sample_log(cond=H,batch_size=N,ddim=R,eta=O,ddim_steps=P,x0=J[:N],mask=I)
 				G=A.decode_first_stage(F.to(A.device));B['samples_outpainting']=G
 		if plot_progressive_rows:
 			with A.ema_scope('Plotting Progressives'):h,e=A.progressive_denoising(H,shape=(A.channels,A.image_size,A.image_size),batch_size=N)
 			f=A._get_denoise_row_from_list(e,desc=_l);B['progressive_row']=f
-		if T:
-			if np.intersect1d(list(B.keys()),T).shape[0]==0:return B
-			else:return{A:B[A]for A in T}
+		if S:
+			if np.intersect1d(list(B.keys()),S).shape[0]==0:return B
+			else:return{A:B[A]for A in S}
 		return B
 	def configure_optimizers(A):
 		E=A.learning_rate;B=list(A.model.parameters())

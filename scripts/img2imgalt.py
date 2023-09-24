@@ -40,18 +40,18 @@ class Script(scripts.Script):
 	def show(A,is_img2img):return is_img2img
 	def ui(A,is_img2img):C=.0;B=True;D=gr.Markdown('\n        * `CFG Scale` should be 2 or lower.\n        ');E=gr.Checkbox(label='Override `Sampling method` to Euler?(this method is built for it)',value=B,elem_id=A.elem_id('override_sampler'));F=gr.Checkbox(label='Override `prompt` to the same value as `original prompt`?(and `negative prompt`)',value=B,elem_id=A.elem_id('override_prompt'));G=gr.Textbox(label='Original prompt',lines=1,elem_id=A.elem_id(_C));H=gr.Textbox(label='Original negative prompt',lines=1,elem_id=A.elem_id(_D));I=gr.Checkbox(label='Override `Sampling Steps` to the same value as `Decode steps`?',value=B,elem_id=A.elem_id('override_steps'));J=gr.Slider(label=_F,minimum=1,maximum=150,step=1,value=50,elem_id=A.elem_id('st'));K=gr.Checkbox(label='Override `Denoising strength` to 1?',value=B,elem_id=A.elem_id('override_strength'));L=gr.Slider(label=_G,minimum=C,maximum=15.,step=.1,value=1.,elem_id=A.elem_id('cfg'));M=gr.Slider(label=_H,minimum=C,maximum=1.,step=.01,value=C,elem_id=A.elem_id('randomness'));N=gr.Checkbox(label='Sigma adjustment for finding noise for image',value=False,elem_id=A.elem_id(_E));return[D,E,F,G,H,I,J,K,L,M,N]
 	def run(A,p,_,override_sampler,override_prompt,original_prompt,original_negative_prompt,override_steps,st,override_strength,cfg,randomness,sigma_adjustment):
-		G=sigma_adjustment;F=randomness;E=cfg;D=original_negative_prompt;C=original_prompt;B=st
+		G=sigma_adjustment;C=randomness;D=cfg;E=original_negative_prompt;F=original_prompt;B=st
 		if override_sampler:p.sampler_name='Euler'
-		if override_prompt:p.prompt=C;p.negative_prompt=D
+		if override_prompt:p.prompt=F;p.negative_prompt=E
 		if override_steps:p.steps=B
 		if override_strength:p.denoising_strength=1.
 		def H(conditioning,unconditional_conditioning,seeds,subseeds,subseed_strength,prompts):
-			I=(p.init_latent.cpu().numpy()*10).astype(int);M=A.cache is not None and A.cache.cfg_scale==E and A.cache.steps==B and A.cache.original_prompt==C and A.cache.original_negative_prompt==D and A.cache.sigma_adjustment==G;N=M and A.cache.latent.shape==I.shape and np.abs(A.cache.latent-I).sum()<100
+			I=(p.init_latent.cpu().numpy()*10).astype(int);M=A.cache is not None and A.cache.cfg_scale==D and A.cache.steps==B and A.cache.original_prompt==F and A.cache.original_negative_prompt==E and A.cache.sigma_adjustment==G;N=M and A.cache.latent.shape==I.shape and np.abs(A.cache.latent-I).sum()<100
 			if N:H=A.cache.noise
 			else:
-				shared.state.job_count+=1;J=p.sd_model.get_learned_conditioning(p.batch_size*[C]);K=p.sd_model.get_learned_conditioning(p.batch_size*[D])
-				if G:H=find_noise_for_image_sigma_adjustment(p,J,K,E,B)
-				else:H=find_noise_for_image(p,J,K,E,B)
-				A.cache=Cached(H,E,B,I,C,D,G)
-			O=processing.create_random_tensors(p.init_latent.shape[1:],seeds=seeds,subseeds=subseeds,subseed_strength=p.subseed_strength,seed_resize_from_h=p.seed_resize_from_h,seed_resize_from_w=p.seed_resize_from_w,p=p);P=((1-F)*H+F*O)/(F**2+(1-F)**2)**.5;L=sd_samplers.create_sampler(p.sampler_name,p.sd_model);Q=L.model_wrap.get_sigmas(p.steps);R=P-p.init_latent/Q[0];p.seed=p.seed+1;return L.sample_img2img(p,p.init_latent,R,conditioning,unconditional_conditioning,image_conditioning=p.image_conditioning)
-		p.sample=H;p.extra_generation_params['Decode prompt']=C;p.extra_generation_params['Decode negative prompt']=D;p.extra_generation_params[_G]=E;p.extra_generation_params[_F]=B;p.extra_generation_params[_H]=F;p.extra_generation_params['Sigma Adjustment']=G;I=processing.process_images(p);return I
+				shared.state.job_count+=1;J=p.sd_model.get_learned_conditioning(p.batch_size*[F]);K=p.sd_model.get_learned_conditioning(p.batch_size*[E])
+				if G:H=find_noise_for_image_sigma_adjustment(p,J,K,D,B)
+				else:H=find_noise_for_image(p,J,K,D,B)
+				A.cache=Cached(H,D,B,I,F,E,G)
+			O=processing.create_random_tensors(p.init_latent.shape[1:],seeds=seeds,subseeds=subseeds,subseed_strength=p.subseed_strength,seed_resize_from_h=p.seed_resize_from_h,seed_resize_from_w=p.seed_resize_from_w,p=p);P=((1-C)*H+C*O)/(C**2+(1-C)**2)**.5;L=sd_samplers.create_sampler(p.sampler_name,p.sd_model);Q=L.model_wrap.get_sigmas(p.steps);R=P-p.init_latent/Q[0];p.seed=p.seed+1;return L.sample_img2img(p,p.init_latent,R,conditioning,unconditional_conditioning,image_conditioning=p.image_conditioning)
+		p.sample=H;p.extra_generation_params['Decode prompt']=F;p.extra_generation_params['Decode negative prompt']=E;p.extra_generation_params[_G]=D;p.extra_generation_params[_F]=B;p.extra_generation_params[_H]=C;p.extra_generation_params['Sigma Adjustment']=G;I=processing.process_images(p);return I

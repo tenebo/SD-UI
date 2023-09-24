@@ -9,7 +9,7 @@ from einops.layers.torch import Rearrange
 from timm.models.layers import trunc_normal_,DropPath
 class WMSA(nn.Module):
 	' Self-attention module in Swin Transformer\n    '
-	def __init__(A,input_dim,output_dim,head_dim,window_size,type):D=head_dim;C=input_dim;B=window_size;super(WMSA,A).__init__();A.input_dim=C;A.output_dim=output_dim;A.head_dim=D;A.scale=A.head_dim**-.5;A.n_heads=C//D;A.window_size=B;A.type=type;A.embedding_layer=nn.Linear(A.input_dim,3*A.input_dim,bias=_D);A.relative_position_params=nn.Parameter(torch.zeros((2*B-1)*(2*B-1),A.n_heads));A.linear=nn.Linear(A.input_dim,A.output_dim);trunc_normal_(A.relative_position_params,std=.02);A.relative_position_params=torch.nn.Parameter(A.relative_position_params.view(2*B-1,2*B-1,A.n_heads).transpose(1,2).transpose(0,1))
+	def __init__(A,input_dim,output_dim,head_dim,window_size,type):C=head_dim;D=input_dim;B=window_size;super(WMSA,A).__init__();A.input_dim=D;A.output_dim=output_dim;A.head_dim=C;A.scale=A.head_dim**-.5;A.n_heads=D//C;A.window_size=B;A.type=type;A.embedding_layer=nn.Linear(A.input_dim,3*A.input_dim,bias=_D);A.relative_position_params=nn.Parameter(torch.zeros((2*B-1)*(2*B-1),A.n_heads));A.linear=nn.Linear(A.input_dim,A.output_dim);trunc_normal_(A.relative_position_params,std=.02);A.relative_position_params=torch.nn.Parameter(A.relative_position_params.view(2*B-1,2*B-1,A.n_heads).transpose(1,2).transpose(0,1))
 	def generate_mask(C,h,w,p,shift):
 		' generating the mask of SW-MSA\n        Args:\n            shift: shift parameters in CyclicShift.\n        Returns:\n            attn_mask: should be (1 1 w p p),\n        ';A=torch.zeros(h,w,p,p,p,p,dtype=torch.bool,device=C.relative_position_params.device)
 		if C.type==_A:return A
@@ -25,9 +25,9 @@ class WMSA(nn.Module):
 	def relative_embedding(A):B=torch.tensor(np.array([[B,C]for B in range(A.window_size)for C in range(A.window_size)]));C=B[:,_E,:]-B[_E,:,:]+A.window_size-1;return A.relative_position_params[:,C[:,:,0].long(),C[:,:,1].long()]
 class Block(nn.Module):
 	def __init__(A,input_dim,output_dim,head_dim,window_size,drop_path,type=_A,input_resolution=_E):
-		' SwinTransformer Block\n        ';E=drop_path;D=window_size;C=output_dim;B=input_dim;super(Block,A).__init__();A.input_dim=B;A.output_dim=C;assert type in[_A,_C];A.type=type
+		' SwinTransformer Block\n        ';C=drop_path;D=window_size;E=output_dim;B=input_dim;super(Block,A).__init__();A.input_dim=B;A.output_dim=E;assert type in[_A,_C];A.type=type
 		if input_resolution<=D:A.type=_A
-		A.ln1=nn.LayerNorm(B);A.msa=WMSA(B,B,head_dim,D,A.type);A.drop_path=DropPath(E)if E>.0 else nn.Identity();A.ln2=nn.LayerNorm(B);A.mlp=nn.Sequential(nn.Linear(B,4*B),nn.GELU(),nn.Linear(4*B,C))
+		A.ln1=nn.LayerNorm(B);A.msa=WMSA(B,B,head_dim,D,A.type);A.drop_path=DropPath(C)if C>.0 else nn.Identity();A.ln2=nn.LayerNorm(B);A.mlp=nn.Sequential(nn.Linear(B,4*B),nn.GELU(),nn.Linear(4*B,E))
 	def forward(A,x):x=x+A.drop_path(A.msa(A.ln1(x)));x=x+A.drop_path(A.mlp(A.ln2(x)));return x
 class ConvTransBlock(nn.Module):
 	def __init__(A,conv_dim,trans_dim,head_dim,window_size,drop_path,type=_A,input_resolution=_E):

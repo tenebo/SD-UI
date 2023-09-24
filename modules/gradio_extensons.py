@@ -13,8 +13,8 @@ def IOComponent_init(self,*C,**B):
 	if scripts.scripts_current is not _A:scripts.scripts_current.after_component(A,**B)
 	return D
 def Block_get_config(self):
-	C='webui_tooltip';A=original_Block_get_config(self);B=getattr(self,C,_A)
-	if B:A[C]=B
+	B='webui_tooltip';A=original_Block_get_config(self);C=getattr(self,B,_A)
+	if C:A[B]=C
 	A.pop(_B,_A);return A
 def BlockContext_init(self,*A,**B):C=original_BlockContext_init(self,*A,**B);add_classes_to_gradio_component(self);return C
 def Blocks_get_config_file(self,*C,**D):

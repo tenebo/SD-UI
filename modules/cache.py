@@ -31,12 +31,12 @@ def cache(subsection):
 					except Exception:os.replace(cache_filename,os.path.join(script_path,'tmp',_B));print('[ERROR] issue occurred while trying to read cache.json, move current cache to tmp/cache.json and create new cache');cache_data={}
 	B=cache_data.get(A,{});cache_data[A]=B;return B
 def cached_data_for_file(subsection,title,filename,func):
-	'\n    Retrieves or generates data for a specific file, using a caching mechanism.\n\n    Parameters:\n        subsection (str): The subsection of the cache to use.\n        title (str): The title of the data entry in the subsection of the cache.\n        filename (str): The path to the file to be checked for modifications.\n        func (callable): A function that generates the data if it is not available in the cache.\n\n    Returns:\n        dict or None: The cached or generated data, or None if data generation fails.\n\n    The `cached_data_for_file` function implements a caching mechanism for data stored in files.\n    It checks if the data associated with the given `title` is present in the cache and compares the\n    modification time of the file with the cached modification time. If the file has been modified,\n    the cache is considered invalid and the data is regenerated using the provided `func`.\n    Otherwise, the cached data is returned.\n\n    If the data generation fails, None is returned to indicate the failure. Otherwise, the generated\n    or cached data is returned as a dictionary.\n    ';G='mtime';C=title;B='value';D=cache(subsection);E=os.path.getmtime(filename);A=D.get(C)
+	'\n    Retrieves or generates data for a specific file, using a caching mechanism.\n\n    Parameters:\n        subsection (str): The subsection of the cache to use.\n        title (str): The title of the data entry in the subsection of the cache.\n        filename (str): The path to the file to be checked for modifications.\n        func (callable): A function that generates the data if it is not available in the cache.\n\n    Returns:\n        dict or None: The cached or generated data, or None if data generation fails.\n\n    The `cached_data_for_file` function implements a caching mechanism for data stored in files.\n    It checks if the data associated with the given `title` is present in the cache and compares the\n    modification time of the file with the cached modification time. If the file has been modified,\n    the cache is considered invalid and the data is regenerated using the provided `func`.\n    Otherwise, the cached data is returned.\n\n    If the data generation fails, None is returned to indicate the failure. Otherwise, the generated\n    or cached data is returned as a dictionary.\n    ';C='mtime';D=title;B='value';E=cache(subsection);F=os.path.getmtime(filename);A=E.get(D)
 	if A:
-		H=A.get(G,0)
-		if E>H:A=_A
+		H=A.get(C,0)
+		if F>H:A=_A
 	if not A or B not in A:
-		F=func()
-		if F is _A:return
-		A={G:E,B:F};D[C]=A;dump_cache()
+		G=func()
+		if G is _A:return
+		A={C:F,B:G};E[D]=A;dump_cache()
 	return A[B]

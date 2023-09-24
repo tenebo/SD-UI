@@ -18,9 +18,9 @@ config_inpainting=os.path.join(sd_configs_path,'v1-inpainting-inference.yaml')
 config_instruct_pix2pix=os.path.join(sd_configs_path,'instruct-pix2pix.yaml')
 config_alt_diffusion=os.path.join(sd_configs_path,'alt-diffusion-inference.yaml')
 def is_using_v_parameterization_for_sd2(state_dict):
-	"\n    Detects whether unet in state_dict is using v-parameterization. Returns True if it is. You're welcome.\n    ";F='model.diffusion_model.';E=False;C=True;import ldm.modules.diffusionmodules.openaimodel;A=devices.cpu
-	with sd_disable_initialization.DisableInitialization():B=ldm.modules.diffusionmodules.openaimodel.UNetModel(use_checkpoint=C,use_fp16=E,image_size=32,in_channels=4,out_channels=4,model_channels=320,attention_resolutions=[4,2,1],num_res_blocks=2,channel_mult=[1,2,4,4],num_head_channels=64,use_spatial_transformer=C,use_linear_in_transformer=C,transformer_depth=1,context_dim=1024,legacy=E);B.eval()
-	with torch.no_grad():G={A.replace(F,''):B for(A,B)in state_dict.items()if F in A};B.load_state_dict(G,strict=C);B.to(device=A,dtype=torch.float);H=torch.ones((1,2,1024),device=A)*.5;D=torch.ones((1,4,8,8),device=A)*.5;I=(B(D,torch.asarray([999],device=A),context=H)-D).mean().item()
+	"\n    Detects whether unet in state_dict is using v-parameterization. Returns True if it is. You're welcome.\n    ";D='model.diffusion_model.';E=False;A=True;import ldm.modules.diffusionmodules.openaimodel;B=devices.cpu
+	with sd_disable_initialization.DisableInitialization():C=ldm.modules.diffusionmodules.openaimodel.UNetModel(use_checkpoint=A,use_fp16=E,image_size=32,in_channels=4,out_channels=4,model_channels=320,attention_resolutions=[4,2,1],num_res_blocks=2,channel_mult=[1,2,4,4],num_head_channels=64,use_spatial_transformer=A,use_linear_in_transformer=A,transformer_depth=1,context_dim=1024,legacy=E);C.eval()
+	with torch.no_grad():G={A.replace(D,''):B for(A,B)in state_dict.items()if D in A};C.load_state_dict(G,strict=A);C.to(device=B,dtype=torch.float);H=torch.ones((1,2,1024),device=B)*.5;F=torch.ones((1,4,8,8),device=B)*.5;I=(C(F,torch.asarray([999],device=B),context=H)-F).mean().item()
 	return I<-1
 def guess_model_config_from_state_dict(sd,filename):
 	A=sd;D=A.get('cond_stage_model.model.transformer.resblocks.0.attn.in_proj_weight',_A);B=A.get('model.diffusion_model.input_blocks.0.0.weight',_A);C=A.get('embedder.model.ln_final.weight',_A)

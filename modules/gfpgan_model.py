@@ -20,7 +20,7 @@ def gfpgann():
 	else:print('Unable to load gfpgan model!');return
 	if hasattr(facexlib.detection.retinaface,'device'):facexlib.detection.retinaface.device=devices.device_gfpgan
 	C=gfpgan_constructor(model_path=B,upscale=1,arch='clean',channel_multiplier=2,bg_upsampler=_A,device=devices.device_gfpgan);loaded_gfpgan_model=C;return C
-def send_model_to(model,device):B=device;A=model;A.gfpgan.to(B);A.face_helper.face_det.to(B);A.face_helper.face_parse.to(B)
+def send_model_to(model,device):A=device;B=model;B.gfpgan.to(A);B.face_helper.face_det.to(A);B.face_helper.face_parse.to(A)
 def gfpgan_fix_faces(np_image):
 	B=np_image;A=gfpgann()
 	if A is _A:return B

@@ -13,14 +13,14 @@ import ldm.models.autoencoder
 from packaging import version
 class VQModel(pl.LightningModule):
 	def __init__(A,ddconfig,lossconfig,n_embed,embed_dim,ckpt_path=_A,ignore_keys=_A,image_key='image',colorize_nlabels=_A,monitor=_A,batch_resize_range=_A,scheduler_config=_A,lr_g_factor=1.,remap=_A,sane_index_shape=_C,use_ema=_C):
-		I='z_channels';H=batch_resize_range;G=monitor;F=ckpt_path;E=n_embed;D=colorize_nlabels;C=embed_dim;B=ddconfig;super().__init__();A.embed_dim=C;A.n_embed=E;A.image_key=image_key;A.encoder=Encoder(**B);A.decoder=Decoder(**B);A.loss=instantiate_from_config(lossconfig);A.quantize=VectorQuantizer(E,C,beta=.25,remap=remap,sane_index_shape=sane_index_shape);A.quant_conv=torch.nn.Conv2d(B[I],C,1);A.post_quant_conv=torch.nn.Conv2d(C,B[I],1)
+		E='z_channels';F=batch_resize_range;G=monitor;H=ckpt_path;I=n_embed;D=colorize_nlabels;B=embed_dim;C=ddconfig;super().__init__();A.embed_dim=B;A.n_embed=I;A.image_key=image_key;A.encoder=Encoder(**C);A.decoder=Decoder(**C);A.loss=instantiate_from_config(lossconfig);A.quantize=VectorQuantizer(I,B,beta=.25,remap=remap,sane_index_shape=sane_index_shape);A.quant_conv=torch.nn.Conv2d(C[E],B,1);A.post_quant_conv=torch.nn.Conv2d(B,C[E],1)
 		if D is not _A:assert type(D)==int;A.register_buffer(_D,torch.randn(3,D,1,1))
 		if G is not _A:A.monitor=G
-		A.batch_resize_range=H
-		if A.batch_resize_range is not _A:print(f"{A.__class__.__name__}: Using per-batch resizing in range {H}.")
+		A.batch_resize_range=F
+		if A.batch_resize_range is not _A:print(f"{A.__class__.__name__}: Using per-batch resizing in range {F}.")
 		A.use_ema=use_ema
 		if A.use_ema:A.model_ema=LitEma(A);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
-		if F is not _A:A.init_from_ckpt(F,ignore_keys=ignore_keys or[])
+		if H is not _A:A.init_from_ckpt(H,ignore_keys=ignore_keys or[])
 		A.scheduler_config=scheduler_config;A.lr_g_factor=lr_g_factor
 	@contextmanager
 	def ema_scope(self,context=_A):
@@ -63,20 +63,20 @@ class VQModel(pl.LightningModule):
 			A=A.detach()
 		return A
 	def training_step(A,batch,batch_idx,optimizer_idx):
-		F='train';B=optimizer_idx;C=A.get_input(batch,A.image_key);D,E,G=A(C,return_pred_indices=_B)
-		if B==0:H,I=A.loss(E,C,D,B,A.global_step,last_layer=A.get_last_layer(),split=F,predicted_indices=G);A.log_dict(I,prog_bar=_C,logger=_B,on_step=_B,on_epoch=_B);return H
-		if B==1:J,K=A.loss(E,C,D,B,A.global_step,last_layer=A.get_last_layer(),split=F);A.log_dict(K,prog_bar=_C,logger=_B,on_step=_B,on_epoch=_B);return J
+		D='train';B=optimizer_idx;C=A.get_input(batch,A.image_key);E,F,G=A(C,return_pred_indices=_B)
+		if B==0:H,I=A.loss(F,C,E,B,A.global_step,last_layer=A.get_last_layer(),split=D,predicted_indices=G);A.log_dict(I,prog_bar=_C,logger=_B,on_step=_B,on_epoch=_B);return H
+		if B==1:J,K=A.loss(F,C,E,B,A.global_step,last_layer=A.get_last_layer(),split=D);A.log_dict(K,prog_bar=_C,logger=_B,on_step=_B,on_epoch=_B);return J
 	def validation_step(A,batch,batch_idx):
-		C=batch_idx;B=batch;D=A._validation_step(B,C)
-		with A.ema_scope():A._validation_step(B,C,suffix='_ema')
+		B=batch_idx;C=batch;D=A._validation_step(C,B)
+		with A.ema_scope():A._validation_step(C,B,suffix='_ema')
 		return D
 	def _validation_step(A,batch,batch_idx,suffix=''):
-		H='val';B=suffix;C=A.get_input(batch,A.image_key);E,F,G=A(C,return_pred_indices=_B);I,D=A.loss(F,C,E,0,A.global_step,last_layer=A.get_last_layer(),split=H+B,predicted_indices=G);L,J=A.loss(F,C,E,1,A.global_step,last_layer=A.get_last_layer(),split=H+B,predicted_indices=G);K=D[f"val{B}/rec_loss"];A.log(f"val{B}/rec_loss",K,prog_bar=_B,logger=_B,on_step=_C,on_epoch=_B,sync_dist=_B);A.log(f"val{B}/aeloss",I,prog_bar=_B,logger=_B,on_step=_C,on_epoch=_B,sync_dist=_B)
+		E='val';B=suffix;C=A.get_input(batch,A.image_key);F,G,H=A(C,return_pred_indices=_B);I,D=A.loss(G,C,F,0,A.global_step,last_layer=A.get_last_layer(),split=E+B,predicted_indices=H);L,J=A.loss(G,C,F,1,A.global_step,last_layer=A.get_last_layer(),split=E+B,predicted_indices=H);K=D[f"val{B}/rec_loss"];A.log(f"val{B}/rec_loss",K,prog_bar=_B,logger=_B,on_step=_C,on_epoch=_B,sync_dist=_B);A.log(f"val{B}/aeloss",I,prog_bar=_B,logger=_B,on_step=_C,on_epoch=_B,sync_dist=_B)
 		if version.parse(pl.__version__)>=version.parse('1.4.0'):del D[f"val{B}/rec_loss"]
 		A.log_dict(D);A.log_dict(J);return A.log_dict
 	def configure_optimizers(A):
-		J='step';I='frequency';H='interval';G='scheduler';E=A.learning_rate;F=A.lr_g_factor*A.learning_rate;print('lr_d',E);print('lr_g',F);C=torch.optim.Adam(list(A.encoder.parameters())+list(A.decoder.parameters())+list(A.quantize.parameters())+list(A.quant_conv.parameters())+list(A.post_quant_conv.parameters()),lr=F,betas=(.5,.9));D=torch.optim.Adam(A.loss.discriminator.parameters(),lr=E,betas=(.5,.9))
-		if A.scheduler_config is not _A:B=instantiate_from_config(A.scheduler_config);print('Setting up LambdaLR scheduler...');B=[{G:LambdaLR(C,lr_lambda=B.schedule),H:J,I:1},{G:LambdaLR(D,lr_lambda=B.schedule),H:J,I:1}];return[C,D],B
+		E='step';F='frequency';G='interval';H='scheduler';I=A.learning_rate;J=A.lr_g_factor*A.learning_rate;print('lr_d',I);print('lr_g',J);C=torch.optim.Adam(list(A.encoder.parameters())+list(A.decoder.parameters())+list(A.quantize.parameters())+list(A.quant_conv.parameters())+list(A.post_quant_conv.parameters()),lr=J,betas=(.5,.9));D=torch.optim.Adam(A.loss.discriminator.parameters(),lr=I,betas=(.5,.9))
+		if A.scheduler_config is not _A:B=instantiate_from_config(A.scheduler_config);print('Setting up LambdaLR scheduler...');B=[{H:LambdaLR(C,lr_lambda=B.schedule),G:E,F:1},{H:LambdaLR(D,lr_lambda=B.schedule),G:E,F:1}];return[C,D],B
 		return[C,D],[]
 	def get_last_layer(A):return A.decoder.conv_out.weight
 	def log_images(B,batch,only_inputs=_C,plot_ema=_C,**H):

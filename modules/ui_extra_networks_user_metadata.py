@@ -20,11 +20,11 @@ class UserMetadataEditor:
 		with gr.Row(elem_classes='edit-user-metadata-buttons'):A.button_cancel=gr.Button('Cancel');A.button_replace_preview=gr.Button('Replace preview',variant=B);A.button_save=gr.Button('Save',variant=B)
 		A.html_status=gr.HTML(elem_classes='edit-user-metadata-status');A.button_cancel.click(fn=_A,_js='closePopup')
 	def get_card_html(C,name):
-		E='preview';B=C.page.items.get(name,{});A=B.get(E,_A)
-		if not A:F,G=os.path.splitext(B[_C]);A=C.page.find_preview(F);B[E]=A
-		if A:D=f'\n            <div class=\'card standalone-card-preview\'>\n                <img src="{html.escape(A)}" class="preview">\n            </div>\n            '
-		else:D="<div class='card standalone-card-preview'></div>"
-		return D
+		D='preview';B=C.page.items.get(name,{});A=B.get(D,_A)
+		if not A:F,G=os.path.splitext(B[_C]);A=C.page.find_preview(F);B[D]=A
+		if A:E=f'\n            <div class=\'card standalone-card-preview\'>\n                <img src="{html.escape(A)}" class="preview">\n            </div>\n            '
+		else:E="<div class='card standalone-card-preview'></div>"
+		return E
 	def relative_path(C,path):
 		A=path
 		for B in C.page.allowed_directories_for_previews():

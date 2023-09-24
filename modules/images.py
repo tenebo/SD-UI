@@ -38,15 +38,15 @@ def image_grid(imgs,batch_size=1,rows=_A):
 	return F
 Grid=namedtuple('Grid',['tiles','tile_w','tile_h','image_w','image_h','overlap'])
 def split_grid(image,tile_w=512,tile_h=512,overlap=64):
-	H=image;C=overlap;B=tile_h;A=tile_w;D=H.width;E=H.height;M=A-C;N=B-C;I=math.ceil((D-C)/M);J=math.ceil((E-C)/N);O=(D-A)/(I-1)if I>1 else 0;P=(E-B)/(J-1)if J>1 else 0;K=Grid([],A,B,D,E,C)
+	H=image;C=overlap;A=tile_h;B=tile_w;D=H.width;E=H.height;M=B-C;N=A-C;I=math.ceil((D-C)/M);J=math.ceil((E-C)/N);O=(D-B)/(I-1)if I>1 else 0;P=(E-A)/(J-1)if J>1 else 0;K=Grid([],B,A,D,E,C)
 	for Q in range(J):
 		L=[];F=int(Q*P)
-		if F+B>=E:F=E-B
+		if F+A>=E:F=E-A
 		for R in range(I):
 			G=int(R*O)
-			if G+A>=D:G=D-A
-			S=H.crop((G,F,G+A,F+B));L.append([G,A,S])
-		K.tiles.append([F,B,L])
+			if G+B>=D:G=D-B
+			S=H.crop((G,F,G+B,F+A));L.append([G,B,S])
+		K.tiles.append([F,A,L])
 	return K
 def combine_grid(grid):
 	A=grid
@@ -63,7 +63,7 @@ def combine_grid(grid):
 class GridAnnotation:
 	def __init__(A,text='',is_active=_D):A.text=text;A.is_active=is_active;A.size=_A
 def draw_grid_annotations(im,width,height,hor_texts,ver_texts,margin=0):
-	J=im;G=margin;F=hor_texts;C=ver_texts;B=height;A=width;c=ImageColor.getcolor(opts.grid_text_active_color,_B);W=ImageColor.getcolor(opts.grid_text_inactive_color,_B);X=ImageColor.getcolor(opts.grid_background_color,_B)
+	J=im;F=margin;G=hor_texts;B=ver_texts;C=height;A=width;c=ImageColor.getcolor(opts.grid_text_active_color,_B);W=ImageColor.getcolor(opts.grid_text_inactive_color,_B);X=ImageColor.getcolor(opts.grid_background_color,_B)
 	def d(drawing,text,font,line_length):
 		A=['']
 		for B in text.split():
@@ -72,28 +72,28 @@ def draw_grid_annotations(im,width,height,hor_texts,ver_texts,margin=0):
 			else:A.append(B)
 		return A
 	def Y(drawing,draw_x,draw_y,lines,initial_fnt,initial_fontsize):
-		D=draw_x;C=drawing;B=draw_y
+		C=draw_x;D=drawing;B=draw_y
 		for A in lines:
 			E=initial_fnt;F=initial_fontsize
-			while C.multiline_textsize(A.text,font=E)[0]>A.allowed_width and F>0:F-=1;E=get_font(F)
-			C.multiline_text((D,B+A.size[1]/2),A.text,font=E,fill=c if A.is_active else W,anchor='mm',align='center')
-			if not A.is_active:C.line((D-A.size[0]//2,B+A.size[1]//2,D+A.size[0]//2,B+A.size[1]//2),fill=W,width=4)
+			while D.multiline_textsize(A.text,font=E)[0]>A.allowed_width and F>0:F-=1;E=get_font(F)
+			D.multiline_text((C,B+A.size[1]/2),A.text,font=E,fill=c if A.is_active else W,anchor='mm',align='center')
+			if not A.is_active:D.line((C-A.size[0]//2,B+A.size[1]//2,C+A.size[0]//2,B+A.size[1]//2),fill=W,width=4)
 			B+=A.size[1]+H
-	N=(A+B)//25;H=N//2;O=get_font(N);K=0 if sum([sum([len(A.text)for A in A])for A in C])==0 else A*3//4;L=J.width//A;M=J.height//B;assert L==len(F),f"bad number of horizontal texts: {len(F)}; must be {L}";assert M==len(C),f"bad number of vertical texts: {len(C)}; must be {M}";e=Image.new(_B,(1,1),X);Z=ImageDraw.Draw(e)
-	for(P,a)in zip(F+C,[A]*len(F)+[K]*len(C)):
+	N=(A+C)//25;H=N//2;O=get_font(N);K=0 if sum([sum([len(A.text)for A in A])for A in B])==0 else A*3//4;L=J.width//A;M=J.height//C;assert L==len(G),f"bad number of horizontal texts: {len(G)}; must be {L}";assert M==len(B),f"bad number of vertical texts: {len(B)}; must be {M}";e=Image.new(_B,(1,1),X);Z=ImageDraw.Draw(e)
+	for(P,a)in zip(G+B,[A]*len(G)+[K]*len(B)):
 		f=[]+P;P.clear()
 		for I in f:g=d(Z,I.text,O,a);P+=[GridAnnotation(A,I.is_active)for A in g]
 		for I in P:Q=Z.multiline_textbbox((0,0),I.text,font=O);I.size=Q[2]-Q[0],Q[3]-Q[1];I.allowed_width=a
-	S=[sum([A.size[1]+H for A in A])-H for A in F];h=[sum([A.size[1]+H for A in A])-H*len(A)for A in C];R=0 if sum(S)==0 else max(S)+H*2;T=Image.new(_B,(J.width+K+G*(L-1),J.height+R+G*(M-1)),X)
+	S=[sum([A.size[1]+H for A in A])-H for A in G];h=[sum([A.size[1]+H for A in A])-H*len(A)for A in B];R=0 if sum(S)==0 else max(S)+H*2;T=Image.new(_B,(J.width+K+F*(L-1),J.height+R+F*(M-1)),X)
 	for D in range(M):
-		for E in range(L):i=J.crop((A*E,B*D,A*(E+1),B*(D+1)));T.paste(i,(K+(A+G)*E,R+(B+G)*D))
+		for E in range(L):i=J.crop((A*E,C*D,A*(E+1),C*(D+1)));T.paste(i,(K+(A+F)*E,R+(C+F)*D))
 	b=ImageDraw.Draw(T)
-	for E in range(L):U=K+(A+G)*E+A/2;V=R/2-S[E]/2;Y(b,U,V,F[E],O,N)
-	for D in range(M):U=K/2;V=R+(B+G)*D+B/2-h[D]/2;Y(b,U,V,C[D],O,N)
+	for E in range(L):U=K+(A+F)*E+A/2;V=R/2-S[E]/2;Y(b,U,V,G[E],O,N)
+	for D in range(M):U=K/2;V=R+(C+F)*D+C/2-h[D]/2;Y(b,U,V,B[D],O,N)
 	return T
 def draw_prompt_matrix(im,width,height,all_prompts,margin=0):A=all_prompts[1:];B=math.ceil(len(A)/2);C=A[:B];D=A[B:];E=[[GridAnnotation(C,is_active=A&1<<B!=0)for(B,C)in enumerate(C)]for A in range(1<<len(C))];F=[[GridAnnotation(C,is_active=A&1<<B!=0)for(B,C)in enumerate(D)]for A in range(1<<len(D))];return draw_grid_annotations(im,width,height,E,F,margin)
 def resize_image(resize_mode,im,width,height,upscaler_name=_A):
-	'\n    Resizes an image with the specified resize_mode, width, and height.\n\n    Args:\n        resize_mode: The mode to use when resizing the image.\n            0: Resize the image to the specified width and height.\n            1: Resize the image to fill the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, cropping the excess.\n            2: Resize the image to fit within the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, filling empty with data from image.\n        im: The image to resize.\n        width: The width to resize the image to.\n        height: The height to resize the image to.\n        upscaler_name: The name of the upscaler to use. If not provided, defaults to opts.upscaler_for_img2img.\n    ';N=resize_mode;J=upscaler_name;C=im;B=height;A=width;J=J or opts.upscaler_for_img2img
+	'\n    Resizes an image with the specified resize_mode, width, and height.\n\n    Args:\n        resize_mode: The mode to use when resizing the image.\n            0: Resize the image to the specified width and height.\n            1: Resize the image to fill the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, cropping the excess.\n            2: Resize the image to fit within the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, filling empty with data from image.\n        im: The image to resize.\n        width: The width to resize the image to.\n        height: The height to resize the image to.\n        upscaler_name: The name of the upscaler to use. If not provided, defaults to opts.upscaler_for_img2img.\n    ';N=resize_mode;J=upscaler_name;C=im;A=height;B=width;J=J or opts.upscaler_for_img2img
 	def M(im,w,h):
 		A=im
 		if J is _A or J==_E or A.mode=='L':return A.resize((w,h),resample=LANCZOS)
@@ -105,16 +105,16 @@ def resize_image(resize_mode,im,width,height,upscaler_name=_A):
 			A=B.scaler.upscale(A,C,B.data_path)
 		if A.width!=w or A.height!=h:A=A.resize((w,h),resample=LANCZOS)
 		return A
-	if N==0:E=M(C,A,B)
-	elif N==1:F=A/B;G=C.width/C.height;H=A if F>G else C.width*B//C.height;I=B if F<=G else C.height*A//C.width;D=M(C,H,I);E=Image.new(_B,(A,B));E.paste(D,box=(A//2-H//2,B//2-I//2))
+	if N==0:E=M(C,B,A)
+	elif N==1:F=B/A;G=C.width/C.height;H=B if F>G else C.width*A//C.height;I=A if F<=G else C.height*B//C.width;D=M(C,H,I);E=Image.new(_B,(B,A));E.paste(D,box=(B//2-H//2,A//2-I//2))
 	else:
-		F=A/B;G=C.width/C.height;H=A if F<G else C.width*B//C.height;I=B if F>=G else C.height*A//C.width;D=M(C,H,I);E=Image.new(_B,(A,B));E.paste(D,box=(A//2-H//2,B//2-I//2))
+		F=B/A;G=C.width/C.height;H=B if F<G else C.width*A//C.height;I=A if F>=G else C.height*B//C.width;D=M(C,H,I);E=Image.new(_B,(B,A));E.paste(D,box=(B//2-H//2,A//2-I//2))
 		if F<G:
-			K=B//2-I//2
-			if K>0:E.paste(D.resize((A,K),box=(0,0,A,0)),box=(0,0));E.paste(D.resize((A,K),box=(0,D.height,A,D.height)),box=(0,K+I))
+			K=A//2-I//2
+			if K>0:E.paste(D.resize((B,K),box=(0,0,B,0)),box=(0,0));E.paste(D.resize((B,K),box=(0,D.height,B,D.height)),box=(0,K+I))
 		elif F>G:
-			L=A//2-H//2
-			if L>0:E.paste(D.resize((L,B),box=(0,0,0,B)),box=(0,0));E.paste(D.resize((L,B),box=(D.width,0,D.width,B)),box=(L+H,0))
+			L=B//2-H//2
+			if L>0:E.paste(D.resize((L,A),box=(0,0,0,A)),box=(0,0));E.paste(D.resize((L,A),box=(D.width,0,D.width,A)),box=(L+H,0))
 	return E
 invalid_filename_chars='<>:"/\\|?*\n\r\t'
 invalid_filename_prefix=' '
@@ -149,13 +149,13 @@ class FilenameGenerator:
 				else:A=A if F==''else f"{A}{F}"
 		return sanitize_filename_part(A)
 	def prompt_no_style(B):
-		D=','
+		C=','
 		if B.p is _A or B.prompt is _A:return
 		A=B.prompt
-		for C in shared.prompt_styles.get_style_prompts(B.p.styles):
-			if C:
-				for E in C.split('{prompt}'):A=A.replace(E,'').replace(', ,',D).strip().strip(D)
-				A=A.replace(C,'').strip().strip(D).strip()
+		for D in shared.prompt_styles.get_style_prompts(B.p.styles):
+			if D:
+				for E in D.split('{prompt}'):A=A.replace(E,'').replace(', ,',C).strip().strip(C)
+				A=A.replace(D,'').strip().strip(C).strip()
 		return sanitize_filename_part(A,replace_spaces=_C)
 	def prompt_words(B):
 		A=[A for A in re_nonletters.split(B.prompt or'')if A]
@@ -218,10 +218,10 @@ def save_image_with_geninfo(image,geninfo,filename,extension=_A,existing_pnginfo
 		if opts.enable_pnginfo and E is not _A:K=piexif.dump({'Exif':{piexif.ExifIFD.UserComment:piexif.helper.UserComment.dump(E or'',encoding='unicode')}});piexif.insert(K,C)
 	else:A.save(C,format=F,quality=opts.jpeg_quality)
 def save_image(image,path,basename,seed=_A,prompt=_A,extension='png',info=_A,short_filename=_C,no_prompt=_C,grid=_C,pnginfo_section_name=_F,p=_A,existing_info=_A,forced_filename=_A,suffix='',save_to_dirs=_A):
-	"Save an image.\n\n    Args:\n        image (`PIL.Image`):\n            The image to be saved.\n        path (`str`):\n            The directory to save the image. Note, the option `save_to_dirs` will make the image to be saved into a sub directory.\n        basename (`str`):\n            The base filename which will be applied to `filename pattern`.\n        seed, prompt, short_filename,\n        extension (`str`):\n            Image file extension, default is `png`.\n        pngsectionname (`str`):\n            Specify the name of the section which `info` will be saved in.\n        info (`str` or `PngImagePlugin.iTXt`):\n            PNG info chunks.\n        existing_info (`dict`):\n            Additional PNG info. `existing_info == {pngsectionname: info, ...}`\n        no_prompt:\n            TODO I don't know its meaning.\n        p (`StandardDemoProcessing`)\n        forced_filename (`str`):\n            If specified, `basename` and filename pattern will be ignored.\n        save_to_dirs (bool):\n            If true, the image will be saved into a subdirectory of `path`.\n\n    Returns: (fullfn, txt_fullfn)\n        fullfn (`str`):\n            The full path of the saved imaged.\n        txt_fullfn (`str` or None):\n            If a text file is saved for this image, this will be its full path. Otherwise None.\n    ";O=forced_filename;L=save_to_dirs;K=pnginfo_section_name;J=basename;G=info;F=path;B=extension;A=image;P=FilenameGenerator(p,seed,prompt,A)
+	"Save an image.\n\n    Args:\n        image (`PIL.Image`):\n            The image to be saved.\n        path (`str`):\n            The directory to save the image. Note, the option `save_to_dirs` will make the image to be saved into a sub directory.\n        basename (`str`):\n            The base filename which will be applied to `filename pattern`.\n        seed, prompt, short_filename,\n        extension (`str`):\n            Image file extension, default is `png`.\n        pngsectionname (`str`):\n            Specify the name of the section which `info` will be saved in.\n        info (`str` or `PngImagePlugin.iTXt`):\n            PNG info chunks.\n        existing_info (`dict`):\n            Additional PNG info. `existing_info == {pngsectionname: info, ...}`\n        no_prompt:\n            TODO I don't know its meaning.\n        p (`StandardDemoProcessing`)\n        forced_filename (`str`):\n            If specified, `basename` and filename pattern will be ignored.\n        save_to_dirs (bool):\n            If true, the image will be saved into a subdirectory of `path`.\n\n    Returns: (fullfn, txt_fullfn)\n        fullfn (`str`):\n            The full path of the saved imaged.\n        txt_fullfn (`str` or None):\n            If a text file is saved for this image, this will be its full path. Otherwise None.\n    ";O=forced_filename;J=save_to_dirs;K=pnginfo_section_name;L=basename;G=info;F=path;B=extension;A=image;P=FilenameGenerator(p,seed,prompt,A)
 	if(A.height>65535 or A.width>65535)and B.lower()in('jpg','jpeg')or(A.height>16383 or A.width>16383)and B.lower()=='webp':print('Image dimensions too large; saving as PNG');B='.png'
-	if L is _A:L=grid and opts.grid_save_to_dirs or not grid and opts.save_to_dirs and not no_prompt
-	if L:V=P.apply(opts.directories_filename_pattern or'[prompt_words]').lstrip(' ').rstrip('\\ /');F=os.path.join(F,V)
+	if J is _A:J=grid and opts.grid_save_to_dirs or not grid and opts.save_to_dirs and not no_prompt
+	if J:V=P.apply(opts.directories_filename_pattern or'[prompt_words]').lstrip(' ').rstrip('\\ /');F=os.path.join(F,V)
 	os.makedirs(F,exist_ok=_D)
 	if O is _A:
 		if short_filename or seed is _A:C=''
@@ -230,16 +230,16 @@ def save_image(image,path,basename,seed=_A,prompt=_A,extension='png',info=_A,sho
 		C=P.apply(C)+suffix;Q=opts.save_images_add_number or C==''
 		if C!=''and Q:C=f"-{C}"
 		if Q:
-			R=get_next_sequence_number(F,J);D=_A
+			R=get_next_sequence_number(F,L);D=_A
 			for S in range(500):
-				W=f"{R+S:05}"if J==''else f"{J}-{R+S:04}";D=os.path.join(F,f"{W}{C}.{B}")
+				W=f"{R+S:05}"if L==''else f"{L}-{R+S:04}";D=os.path.join(F,f"{W}{C}.{B}")
 				if not os.path.exists(D):break
 		else:D=os.path.join(F,f"{C}.{B}")
 	else:D=os.path.join(F,f"{O}.{B}")
 	T=existing_info or{}
 	if G is not _A:T[K]=G
 	E=script_callbacks.ImageSaveParams(A,p,D,T);script_callbacks.before_image_saved_callback(E);A=E.image;D=E.filename;G=E.pnginfo.get(K,_A)
-	def U(image_to_save,filename_without_extension,extension):'\n        save image with .tmp extension to avoid race condition when another process detects new image in the directory\n        ';B=extension;A=filename_without_extension;C=f"{A}.tmp";save_image_with_geninfo(image_to_save,G,C,B,existing_pnginfo=E.pnginfo,pnginfo_section_name=K);os.replace(C,A+B)
+	def U(image_to_save,filename_without_extension,extension):'\n        save image with .tmp extension to avoid race condition when another process detects new image in the directory\n        ';A=extension;B=filename_without_extension;C=f"{B}.tmp";save_image_with_geninfo(image_to_save,G,C,A,existing_pnginfo=E.pnginfo,pnginfo_section_name=K);os.replace(C,B+A)
 	H,B=os.path.splitext(E.filename)
 	if hasattr(os,'statvfs'):X=os.statvfs(F).f_namemax;H=H[:X-max(4,len(B))];E.filename=H+B;D=E.filename
 	U(A,H,B);A.already_saved_as=D;M=A.width>opts.target_side_length or A.height>opts.target_side_length

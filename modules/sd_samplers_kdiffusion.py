@@ -74,17 +74,17 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
 		if D:B=torch.cat([B[:-2],B[-1:]])
 		return B
 	def sample_img2img(A,p,x,noise,conditioning,unconditional_conditioning,steps=_C,image_conditioning=_C):
-		K='sigma_sched';F=steps;E=noise;F,H=sd_samplers_common.setup_img2img_steps(p,F);I=A.get_sigmas(p,F);C=I[F-H-1:];G=x+E*C[0]
-		if opts.img2img_extra_noise>0:p.extra_generation_params['Extra noise']=opts.img2img_extra_noise;J=ExtraNoiseParams(E,x,G);extra_noise_callback(J);E=J.noise;G+=E*opts.img2img_extra_noise
+		H='sigma_sched';E=steps;F=noise;E,I=sd_samplers_common.setup_img2img_steps(p,E);J=A.get_sigmas(p,E);C=J[E-I-1:];G=x+F*C[0]
+		if opts.img2img_extra_noise>0:p.extra_generation_params['Extra noise']=opts.img2img_extra_noise;K=ExtraNoiseParams(F,x,G);extra_noise_callback(K);F=K.noise;G+=F*opts.img2img_extra_noise
 		B=A.initialize(p);D=inspect.signature(A.func).parameters
 		if _N in D:B[_N]=C[-2]
 		if _P in D:B[_P]=C[0]
 		if'n'in D:B['n']=len(C)-1
-		if K in D:B[K]=C
+		if H in D:B[H]=C
 		if _R in D:B[_R]=C
-		if A.config.options.get(_D,_O):L=A.create_noise_sampler(x,I,p);B[_h]=L
+		if A.config.options.get(_D,_O):L=A.create_noise_sampler(x,J,p);B[_h]=L
 		if A.config.options.get(_K,_C)==_L:B[_K]=_L
-		A.model_wrap_cfg.init_latent=x;A.last_latent=x;A.sampler_extra_args={'cond':conditioning,_i:image_conditioning,_j:unconditional_conditioning,_k:p.cfg_scale,_l:A.s_min_uncond};M=A.launch_sampling(H+1,lambda:A.func(A.model_wrap_cfg,G,extra_args=A.sampler_extra_args,disable=_O,callback=A.callback_state,**B))
+		A.model_wrap_cfg.init_latent=x;A.last_latent=x;A.sampler_extra_args={'cond':conditioning,_i:image_conditioning,_j:unconditional_conditioning,_k:p.cfg_scale,_l:A.s_min_uncond};M=A.launch_sampling(I+1,lambda:A.func(A.model_wrap_cfg,G,extra_args=A.sampler_extra_args,disable=_O,callback=A.callback_state,**B))
 		if A.model_wrap_cfg.padded_cond_uncond:p.extra_generation_params[_m]=_A
 		return M
 	def sample(A,p,x,conditioning,unconditional_conditioning,steps=_C,image_conditioning=_C):

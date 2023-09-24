@@ -20,16 +20,16 @@ def setup_img2img_steps(p,steps=_A):
 	return A,C
 approximation_indexes={'Full':0,'Approx NN':1,'Approx cheap':2,'TAESD':3}
 def samples_to_images_tensor(sample,approximation=_A,model=_A):
-	'Transforms 4-channel latent space images into 3-channel RGB image tensors, with values in range [-1, 1].';D=model;C=sample;A=approximation
+	'Transforms 4-channel latent space images into 3-channel RGB image tensors, with values in range [-1, 1].';C=model;D=sample;A=approximation
 	if A is _A or shared.state.interrupted and opts.live_preview_fast_interrupt:
 		A=approximation_indexes.get(opts.show_progress_type,0);from modules import lowvram as E
 		if A==0 and E.is_enabled(shared.sd_model)and not shared.opts.live_preview_allow_lowvram_full:A=1
-	if A==2:B=sd_vae_approx.cheap_approximation(C)
-	elif A==1:B=sd_vae_approx.model()(C.to(devices.device,devices.dtype)).detach()
-	elif A==3:B=sd_vae_taesd.decoder_model()(C.to(devices.device,devices.dtype)).detach();B=B*2-1
+	if A==2:B=sd_vae_approx.cheap_approximation(D)
+	elif A==1:B=sd_vae_approx.model()(D.to(devices.device,devices.dtype)).detach()
+	elif A==3:B=sd_vae_taesd.decoder_model()(D.to(devices.device,devices.dtype)).detach();B=B*2-1
 	else:
-		if D is _A:D=shared.sd_model
-		with devices.without_autocast():B=D.decode_first_stage(C.to(D.first_stage_model.dtype))
+		if C is _A:C=shared.sd_model
+		with devices.without_autocast():B=C.decode_first_stage(D.to(C.first_stage_model.dtype))
 	return B
 def single_sample_to_image(sample,approximation=_A):A=samples_to_images_tensor(sample.unsqueeze(0),approximation)[0]*.5+.5;A=torch.clamp(A,min=.0,max=1.);A=255.*np.moveaxis(A.cpu().numpy(),0,2);A=A.astype(np.uint8);return Image.fromarray(A)
 def decode_first_stage(model,x):x=x.to(devices.dtype_vae);A=approximation_indexes.get(opts.sd_vae_decode_method,0);return samples_to_images_tensor(x,A,model)
@@ -62,14 +62,14 @@ def replace_torchsde_browinan():
 	torchsde._brownian.brownian_interval._randn=A
 replace_torchsde_browinan()
 def apply_refiner(cfg_denoiser):
-	E='second pass';A=cfg_denoiser;F=A.step/A.total_steps;C=A.p.refiner_switch_at;B=A.p.refiner_checkpoint_info
+	D='second pass';A=cfg_denoiser;F=A.step/A.total_steps;C=A.p.refiner_switch_at;B=A.p.refiner_checkpoint_info
 	if C is not _A and F<C:return _B
 	if B is _A or shared.sd_model.sd_checkpoint_info==B:return _B
 	if getattr(A.p,'enable_hr',_B):
-		D=A.p.is_hr_pass
-		if opts.hires_fix_refiner_pass=='first pass'and D:return _B
-		if opts.hires_fix_refiner_pass==E and not D:return _B
-		if opts.hires_fix_refiner_pass!=E:A.p.extra_generation_params['Hires refiner']=opts.hires_fix_refiner_pass
+		E=A.p.is_hr_pass
+		if opts.hires_fix_refiner_pass=='first pass'and E:return _B
+		if opts.hires_fix_refiner_pass==D and not E:return _B
+		if opts.hires_fix_refiner_pass!=D:A.p.extra_generation_params['Hires refiner']=opts.hires_fix_refiner_pass
 	A.p.extra_generation_params['Refiner']=B.short_title;A.p.extra_generation_params['Refiner switch at']=C
 	with sd_models.SkipWritingToConfig():sd_models.reload_model_weights(info=B)
 	devices.torch_gc();A.p.setup_conds();A.update_inner_model();return True
@@ -95,18 +95,18 @@ class Sampler:
 		except InterruptedException:return A.last_latent
 	def number_of_needed_noises(A,p):return p.steps
 	def initialize(A,p):
-		L='eta';K='s_noise';J='s_tmax';I='s_tmin';H='s_churn';A.p=p;A.model_wrap_cfg.p=p;A.model_wrap_cfg.mask=p.mask if hasattr(p,'mask')else _A;A.model_wrap_cfg.nmask=p.nmask if hasattr(p,'nmask')else _A;A.model_wrap_cfg.step=0;A.model_wrap_cfg.image_cfg_scale=getattr(p,'image_cfg_scale',_A);A.eta=p.eta if p.eta is not _A else getattr(opts,A.eta_option_field,.0);A.s_min_uncond=getattr(p,'s_min_uncond',.0);k_diffusion.sampling.torch=TorchHijack(p);B={}
+		L='eta';H='s_noise';I='s_tmax';J='s_tmin';K='s_churn';A.p=p;A.model_wrap_cfg.p=p;A.model_wrap_cfg.mask=p.mask if hasattr(p,'mask')else _A;A.model_wrap_cfg.nmask=p.nmask if hasattr(p,'nmask')else _A;A.model_wrap_cfg.step=0;A.model_wrap_cfg.image_cfg_scale=getattr(p,'image_cfg_scale',_A);A.eta=p.eta if p.eta is not _A else getattr(opts,A.eta_option_field,.0);A.s_min_uncond=getattr(p,'s_min_uncond',.0);k_diffusion.sampling.torch=TorchHijack(p);B={}
 		for C in A.extra_params:
 			if hasattr(p,C)and C in inspect.signature(A.func).parameters:B[C]=getattr(p,C)
 		if L in inspect.signature(A.func).parameters:
 			if A.eta!=A.eta_default:p.extra_generation_params[A.eta_infotext_field]=A.eta
 			B[L]=A.eta
 		if len(A.extra_params)>0:
-			D=getattr(opts,H,p.s_churn);E=getattr(opts,I,p.s_tmin);F=getattr(opts,J,p.s_tmax)or A.s_tmax;G=getattr(opts,K,p.s_noise)
-			if H in B and D!=A.s_churn:B[H]=D;p.s_churn=D;p.extra_generation_params['Sigma churn']=D
-			if I in B and E!=A.s_tmin:B[I]=E;p.s_tmin=E;p.extra_generation_params['Sigma tmin']=E
-			if J in B and F!=A.s_tmax:B[J]=F;p.s_tmax=F;p.extra_generation_params['Sigma tmax']=F
-			if K in B and G!=A.s_noise:B[K]=G;p.s_noise=G;p.extra_generation_params['Sigma noise']=G
+			D=getattr(opts,K,p.s_churn);E=getattr(opts,J,p.s_tmin);F=getattr(opts,I,p.s_tmax)or A.s_tmax;G=getattr(opts,H,p.s_noise)
+			if K in B and D!=A.s_churn:B[K]=D;p.s_churn=D;p.extra_generation_params['Sigma churn']=D
+			if J in B and E!=A.s_tmin:B[J]=E;p.s_tmin=E;p.extra_generation_params['Sigma tmin']=E
+			if I in B and F!=A.s_tmax:B[I]=F;p.s_tmax=F;p.extra_generation_params['Sigma tmax']=F
+			if H in B and G!=A.s_noise:B[H]=G;p.s_noise=G;p.extra_generation_params['Sigma noise']=G
 		return B
 	def create_noise_sampler(F,x,sigmas,p):
 		'For DPM++ SDE: manually create noise sampler to enable deterministic results across different batch sizes';A=sigmas

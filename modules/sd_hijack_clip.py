@@ -55,23 +55,23 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
 			E.append(D)
 		return E,B
 	def forward(A,texts):
-		'\n        Accepts an array of texts; Passes texts through transformers network to create a tensor with numerical representation of those texts.\n        Returns a tensor with shape of (B, T, C), where B is length of the array; T is length, in tokens, of texts (including padding) - T will\n        be a multiple of 77; and C is dimensionality of each token - for SD1 it\'s 768, for SD2 it\'s 1024, and for SDXL it\'s 1280.\n        An example shape returned by this function can be: (2, 77, 768).\n        For SDXL, instead of returning one tensor avobe, it returns a tuple with two: the other one with shape (B, 1280) with pooled values.\n        Webui usually sends just one text at a time through this function - the only time when texts is an array with more than one elemenet\n        is when you do prompt editing: "a picture of a [cat:dog:0.4] eating ice cream"\n        ';I=texts;H='TI hashes'
+		'\n        Accepts an array of texts; Passes texts through transformers network to create a tensor with numerical representation of those texts.\n        Returns a tensor with shape of (B, T, C), where B is length of the array; T is length, in tokens, of texts (including padding) - T will\n        be a multiple of 77; and C is dimensionality of each token - for SD1 it\'s 768, for SD2 it\'s 1024, and for SDXL it\'s 1280.\n        An example shape returned by this function can be: (2, 77, 768).\n        For SDXL, instead of returning one tensor avobe, it returns a tuple with two: the other one with shape (B, 1280) with pooled values.\n        Webui usually sends just one text at a time through this function - the only time when texts is an array with more than one elemenet\n        is when you do prompt editing: "a picture of a [cat:dog:0.4] eating ice cream"\n        ';I=texts;E='TI hashes'
 		if opts.use_old_emphasis_implementation:import modules.sd_hijack_clip_old;return modules.sd_hijack_clip_old.forward_old(A,I)
-		J,R=A.process_texts(I);E={};M=max([len(A)for A in J]);B=[]
+		J,R=A.process_texts(I);F={};M=max([len(A)for A in J]);B=[]
 		for K in range(M):
-			F=[B[K]if K<len(B)else A.empty_chunk()for B in J];N=[A.tokens for A in F];O=[A.multipliers for A in F];A.hijack.fixes=[A.fixes for A in F]
+			G=[B[K]if K<len(B)else A.empty_chunk()for B in J];N=[A.tokens for A in G];O=[A.multipliers for A in G];A.hijack.fixes=[A.fixes for A in G]
 			for P in A.hijack.fixes:
-				for(S,C)in P:E[C.name]=C
+				for(S,C)in P:F[C.name]=C
 			Q=A.process_tokens(N,O);B.append(Q)
-		if opts.textual_inversion_add_hashes_to_infotext and E:
+		if opts.textual_inversion_add_hashes_to_infotext and F:
 			D=[]
-			for(G,C)in E.items():
+			for(H,C)in F.items():
 				L=C.shorthash
 				if not L:continue
-				G=G.replace(':','').replace(',','');D.append(f"{G}: {L}")
+				H=H.replace(':','').replace(',','');D.append(f"{H}: {L}")
 			if D:
-				if A.hijack.extra_generation_params.get(H):D.append(A.hijack.extra_generation_params.get(H))
-				A.hijack.extra_generation_params[H]=', '.join(D)
+				if A.hijack.extra_generation_params.get(E):D.append(A.hijack.extra_generation_params.get(E))
+				A.hijack.extra_generation_params[E]=', '.join(D)
 		if getattr(A.wrapped,'return_pooled',_B):return torch.hstack(B),B[0].pooled
 		else:return torch.hstack(B)
 	def process_tokens(B,remade_batch_tokens,batch_multipliers):

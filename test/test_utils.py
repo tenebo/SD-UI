@@ -1,4 +1,4 @@
 import pytest,requests
-def test_options_write(base_url):C='send_seed';B=f"{base_url}/sdapi/v1/options";A=requests.get(B);assert A.status_code==200;D=A.json()[C];assert requests.post(B,json={C:not D}).status_code==200;A=requests.get(B);assert A.status_code==200;assert A.json()[C]==(not D);requests.post(B,json={C:D})
+def test_options_write(base_url):B='send_seed';C=f"{base_url}/sdapi/v1/options";A=requests.get(C);assert A.status_code==200;D=A.json()[B];assert requests.post(C,json={B:not D}).status_code==200;A=requests.get(C);assert A.status_code==200;assert A.json()[B]==(not D);requests.post(C,json={B:D})
 @pytest.mark.parametrize('url',['sdapi/v1/cmd-flags','sdapi/v1/samplers','sdapi/v1/upscalers','sdapi/v1/sd-models','sdapi/v1/hypernetworks','sdapi/v1/face-restorers','sdapi/v1/realesrgan-models','sdapi/v1/prompt-styles','sdapi/v1/embeddings'])
 def test_get_api_url(base_url,url):assert requests.get(f"{base_url}/{url}").status_code==200

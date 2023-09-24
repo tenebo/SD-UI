@@ -26,24 +26,24 @@ class ScriptPostprocessingUpscale(scripts_postprocessing.ScriptPostprocessing):
 			with FormRow():J=gr.Dropdown(label='Upscaler 2',elem_id='extras_upscaler_2',choices=[A.name for A in shared.sd_upscalers],value=shared.sd_upscalers[0].name);K=gr.Slider(minimum=.0,maximum=1.,step=.001,label='Upscaler 2 visibility',value=.0,elem_id='extras_upscaler_2_visibility')
 		G.click(lambda w,h:(h,w),inputs=[B,C],outputs=[B,C],show_progress=_C);D.select(fn=lambda:0,inputs=[],outputs=[A]);F.select(fn=lambda:1,inputs=[],outputs=[A]);return{'upscale_mode':A,_D:E,'upscale_to_width':B,'upscale_to_height':C,'upscale_crop':H,'upscaler_1_name':I,'upscaler_2_name':J,'upscaler_2_visibility':K}
 	def upscale(L,image,info,upscaler,upscale_mode,upscale_by,upscale_to_width,upscale_to_height,upscale_crop):
-		H=upscale_crop;G=upscale_mode;F=upscaler;E=info;D=upscale_by;C=upscale_to_height;B=upscale_to_width;A=image
-		if G==1:D=max(B/A.width,C/A.height);E['Postprocess upscale to']=f"{B}x{C}"
-		else:E['Postprocess upscale by']=D
-		I=hash(np.array(A.getdata()).tobytes()),F.name,G,D,B,C,H;J=upscale_cache.pop(I,_A)
+		H=upscale_crop;E=upscale_mode;F=upscaler;G=info;D=upscale_by;B=upscale_to_height;C=upscale_to_width;A=image
+		if E==1:D=max(C/A.width,B/A.height);G['Postprocess upscale to']=f"{C}x{B}"
+		else:G['Postprocess upscale by']=D
+		I=hash(np.array(A.getdata()).tobytes()),F.name,E,D,C,B,H;J=upscale_cache.pop(I,_A)
 		if J is not _A:A=J
 		else:A=F.scaler.upscale(A,D,F.data_path)
 		upscale_cache[I]=A
 		if len(upscale_cache)>shared.opts.upscaling_max_images_in_cache:upscale_cache.pop(next(iter(upscale_cache),_A),_A)
-		if G==1 and H:K=Image.new('RGB',(B,C));K.paste(A,box=(B//2-A.width//2,C//2-A.height//2));A=K;E['Postprocess crop to']=f"{A.width}x{A.height}"
+		if E==1 and H:K=Image.new('RGB',(C,B));K.paste(A,box=(C//2-A.width//2,B//2-A.height//2));A=K;G['Postprocess crop to']=f"{A.width}x{A.height}"
 		return A
 	def process(G,pp,upscale_mode=1,upscale_by=2.,upscale_to_width=_A,upscale_to_height=_A,upscale_crop=_C,upscaler_1_name=_A,upscaler_2_name=_A,upscaler_2_visibility=.0):
-		M=upscaler_2_visibility;L=upscale_crop;K=upscale_to_height;J=upscale_to_width;I=upscale_by;H=upscale_mode;C=upscaler_2_name;B=upscaler_1_name;A=pp
-		if B==_B:B=_A
-		D=next(iter([A for A in shared.sd_upscalers if A.name==B]),_A);assert D or B is _A,f"could not find upscaler named {B}"
-		if not D:return
+		H=upscaler_2_visibility;I=upscale_crop;J=upscale_to_height;K=upscale_to_width;L=upscale_by;M=upscale_mode;B=upscaler_2_name;C=upscaler_1_name;A=pp
 		if C==_B:C=_A
-		E=next(iter([A for A in shared.sd_upscalers if A.name==C and A.name!=_B]),_A);assert E or C is _A,f"could not find upscaler named {C}";F=G.upscale(A.image,A.info,D,H,I,J,K,L);A.info[_E]=D.name
-		if E and M>0:N=G.upscale(A.image,A.info,E,H,I,J,K,L);F=Image.blend(F,N,M);A.info['Postprocess upscaler 2']=E.name
+		D=next(iter([A for A in shared.sd_upscalers if A.name==C]),_A);assert D or C is _A,f"could not find upscaler named {C}"
+		if not D:return
+		if B==_B:B=_A
+		E=next(iter([A for A in shared.sd_upscalers if A.name==B and A.name!=_B]),_A);assert E or B is _A,f"could not find upscaler named {B}";F=G.upscale(A.image,A.info,D,M,L,K,J,I);A.info[_E]=D.name
+		if E and H>0:N=G.upscale(A.image,A.info,E,M,L,K,J,I);F=Image.blend(F,N,H);A.info['Postprocess upscaler 2']=E.name
 		A.image=F
 	def image_changed(A):upscale_cache.clear()
 class ScriptPostprocessingUpscaleSimple(ScriptPostprocessingUpscale):

@@ -33,17 +33,17 @@ def mod2normal(state_dict):
 		B['model.1.sub.23.weight']=A['trunk_conv.weight'];B['model.1.sub.23.bias']=A['trunk_conv.bias'];B[_J]=A['upconv1.weight'];B[_K]=A['upconv1.bias'];B[_L]=A['upconv2.weight'];B[_M]=A['upconv2.bias'];B['model.8.weight']=A['HRconv.weight'];B['model.8.bias']=A['HRconv.bias'];B['model.10.weight']=A[_N];B['model.10.bias']=A[_O];A=B
 	return A
 def resrgan2normal(state_dict,nb=23):
-	G='conv_up3.weight';A=state_dict
+	F='conv_up3.weight';A=state_dict
 	if _A in A and _P in A:
-		E=0;B={};F=list(A);B[_B]=A[_A];B[_E]=A[_F]
-		for D in F.copy():
+		E=0;B={};G=list(A);B[_B]=A[_A];B[_E]=A[_F]
+		for D in G.copy():
 			if'rdb'in D:
 				C=D.replace('body.',_G);C=C.replace('.rdb','.RDB')
 				if _C in D:C=C.replace(_C,_H)
 				elif _D in D:C=C.replace(_D,_I)
-				B[C]=A[D];F.remove(D)
+				B[C]=A[D];G.remove(D)
 		B[f"model.1.sub.{nb}.weight"]=A['conv_body.weight'];B[f"model.1.sub.{nb}.bias"]=A['conv_body.bias'];B[_J]=A['conv_up1.weight'];B[_K]=A['conv_up1.bias'];B[_L]=A['conv_up2.weight'];B[_M]=A['conv_up2.bias']
-		if G in A:E=3;B['model.9.weight']=A[G];B['model.9.bias']=A['conv_up3.bias']
+		if F in A:E=3;B['model.9.weight']=A[F];B['model.9.bias']=A['conv_up3.bias']
 		B[f"model.{8+E}.weight"]=A['conv_hr.weight'];B[f"model.{8+E}.bias"]=A['conv_hr.bias'];B[f"model.{10+E}.weight"]=A[_N];B[f"model.{10+E}.bias"]=A[_O];A=B
 	return A
 def infer_params(state_dict):
@@ -71,12 +71,12 @@ class UpscalerESRGAN(Upscaler):
 		except Exception as E:print(f"Unable to load ESRGAN model {B}: {E}",file=sys.stderr);return A
 		C.to(devices.device_esrgan);A=esrgan_upscale(C,A);return A
 	def load_model(D,path):
-		G='params';F='params_ema'
+		F='params';G='params_ema'
 		if path.startswith('http'):C=modelloader.load_file_from_url(url=D.model_url,model_dir=D.model_download_path,file_name=f"{D.model_name}.pth")
 		else:C=path
 		A=torch.load(C,map_location='cpu'if devices.device_esrgan.type=='mps'else None)
-		if F in A:A=A[F]
-		elif G in A:A=A[G];H=16 if'realesr-animevideov3'in C else 32;B=arch.SRVGGNetCompact(num_in_ch=3,num_out_ch=3,num_feat=64,num_conv=H,upscale=4,act_type='prelu');B.load_state_dict(A);B.eval();return B
+		if G in A:A=A[G]
+		elif F in A:A=A[F];H=16 if'realesr-animevideov3'in C else 32;B=arch.SRVGGNetCompact(num_in_ch=3,num_out_ch=3,num_feat=64,num_conv=H,upscale=4,act_type='prelu');B.load_state_dict(A);B.eval();return B
 		if _P in A and _A in A:E=6 if'RealESRGAN_x4plus_anime_6B'in C else 23;A=resrgan2normal(A,E)
 		elif _A in A:A=mod2normal(A)
 		elif _B not in A:raise Exception('The file is not a recognized ESRGAN model.')

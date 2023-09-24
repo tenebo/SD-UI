@@ -41,11 +41,11 @@ class Fuse_sft_block(nn.Module):
 @ARCH_REGISTRY.register()
 class CodeFormer(VQAutoEncoder):
 	def __init__(A,dim_embd=512,n_head=8,n_layers=9,codebook_size=1024,latent_size=256,connect_list=(_C,_D,_E,_F),fix_modules=('quantize','generator')):
-		F=fix_modules;E=codebook_size;D='512';C='16';B=dim_embd;super(CodeFormer,A).__init__(512,64,[1,2,2,4,4,8],'nearest',2,[16],E)
-		if F is not _A:
-			for I in F:
+		E=fix_modules;F=codebook_size;C='512';D='16';B=dim_embd;super(CodeFormer,A).__init__(512,64,[1,2,2,4,4,8],'nearest',2,[16],F)
+		if E is not _A:
+			for I in E:
 				for J in getattr(A,I).parameters():J.requires_grad=_B
-		A.connect_list=connect_list;A.n_layers=n_layers;A.dim_embd=B;A.dim_mlp=B*2;A.position_emb=nn.Parameter(torch.zeros(latent_size,A.dim_embd));A.feat_emb=nn.Linear(256,A.dim_embd);A.ft_layers=nn.Sequential(*[TransformerSALayer(embed_dim=B,nhead=n_head,dim_mlp=A.dim_mlp,dropout=.0)for C in range(A.n_layers)]);A.idx_pred_layer=nn.Sequential(nn.LayerNorm(B),nn.Linear(B,E,bias=_B));A.channels={C:512,_C:256,_D:256,_E:128,_F:128,D:64};A.fuse_encoder_block={D:2,_F:5,_E:8,_D:11,_C:14,C:18};A.fuse_generator_block={C:6,_C:9,_D:12,_E:15,_F:18,D:21};A.fuse_convs_dict=nn.ModuleDict()
+		A.connect_list=connect_list;A.n_layers=n_layers;A.dim_embd=B;A.dim_mlp=B*2;A.position_emb=nn.Parameter(torch.zeros(latent_size,A.dim_embd));A.feat_emb=nn.Linear(256,A.dim_embd);A.ft_layers=nn.Sequential(*[TransformerSALayer(embed_dim=B,nhead=n_head,dim_mlp=A.dim_mlp,dropout=.0)for C in range(A.n_layers)]);A.idx_pred_layer=nn.Sequential(nn.LayerNorm(B),nn.Linear(B,F,bias=_B));A.channels={D:512,_C:256,_D:256,_E:128,_F:128,C:64};A.fuse_encoder_block={C:2,_F:5,_E:8,_D:11,_C:14,D:18};A.fuse_generator_block={D:6,_C:9,_D:12,_E:15,_F:18,C:21};A.fuse_convs_dict=nn.ModuleDict()
 		for G in A.connect_list:H=A.channels[G];A.fuse_convs_dict[G]=Fuse_sft_block(H,H)
 	def _init_weights(B,module):
 		A=module

@@ -7,13 +7,13 @@ from modules.processing import process_images
 from modules.shared import opts,state
 import modules.sd_samplers
 def draw_xy_grid(xs,ys,x_label,y_label,cell):
-	B=ys;A=xs;C=[];G=[[images.GridAnnotation(y_label(A))]for A in B];H=[[images.GridAnnotation(x_label(A))]for A in A];D=None;state.job_count=len(A)*len(B)
-	for(I,J)in enumerate(B):
-		for(K,L)in enumerate(A):
-			state.job=f"{K+I*len(A)+1} out of {len(A)*len(B)}";F=cell(L,J)
+	A=ys;B=xs;C=[];G=[[images.GridAnnotation(y_label(A))]for A in A];H=[[images.GridAnnotation(x_label(A))]for A in B];D=None;state.job_count=len(B)*len(A)
+	for(I,J)in enumerate(A):
+		for(K,L)in enumerate(B):
+			state.job=f"{K+I*len(B)+1} out of {len(B)*len(A)}";F=cell(L,J)
 			if D is None:D=F
 			C.append(F.images[0])
-	E=images.image_grid(C,rows=len(B));E=images.draw_grid_annotations(E,C[0].width,C[0].height,H,G);D.images=[E];return D
+	E=images.image_grid(C,rows=len(A));E=images.draw_grid_annotations(E,C[0].width,C[0].height,H,G);D.images=[E];return D
 class Script(scripts.Script):
 	def title(A):return'Prompt matrix'
 	def ui(A,is_img2img):

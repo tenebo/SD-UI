@@ -38,10 +38,10 @@ opt_f=8
 def setup_color_correction(image):logging.info('Calibrating color correction.');A=cv2.cvtColor(np.asarray(image.copy()),cv2.COLOR_RGB2LAB);return A
 def apply_color_correction(correction,original_image):B=original_image;logging.info('Applying color correction.');A=Image.fromarray(cv2.cvtColor(exposure.match_histograms(cv2.cvtColor(np.asarray(B),cv2.COLOR_RGB2LAB),correction,channel_axis=2),cv2.COLOR_LAB2RGB).astype('uint8'));A=blendLayers(A,B,BlendType.LUMINOSITY);return A.convert(_F)
 def apply_overlay(image,paste_loc,index,overlays):
-	E=index;D=paste_loc;B=overlays;A=image
-	if B is _A or E>=len(B):return A
-	C=B[E]
-	if D is not _A:G,H,I,J=D;F=Image.new(_E,(C.width,C.height));A=images.resize_image(1,A,I,J);F.paste(A,(G,H));A=F
+	D=index;E=paste_loc;B=overlays;A=image
+	if B is _A or D>=len(B):return A
+	C=B[D]
+	if E is not _A:G,H,I,J=E;F=Image.new(_E,(C.width,C.height));A=images.resize_image(1,A,I,J);F.paste(A,(G,H));A=F
 	A=A.convert(_E);A.alpha_composite(C);A=A.convert(_F);return A
 def create_binary_mask(image):
 	A=image
@@ -120,15 +120,15 @@ class StandardDemoProcessing:
 		A.all_prompts=[shared.prompt_styles.apply_styles_to_prompt(B,A.styles)for B in A.all_prompts];A.all_negative_prompts=[shared.prompt_styles.apply_negative_styles_to_prompt(B,A.styles)for B in A.all_negative_prompts];A.main_prompt=A.all_prompts[0];A.main_negative_prompt=A.all_negative_prompts[0]
 	def cached_params(A,required_prompts,steps,extra_network_data,hires_steps=_A,use_old_scheduling=_B):'Returns parameters that invalidate the cond cache if changed';return required_prompts,steps,hires_steps,use_old_scheduling,opts.CLIP_stop_at_last_layers,shared.sd_model.sd_checkpoint_info,extra_network_data,opts.sdxl_crop_left,opts.sdxl_crop_top,A.width,A.height
 	def get_conds_with_caching(E,function,required_prompts,steps,caches,extra_network_data,hires_steps=_A):
-		'\n        Returns the result of calling function(shared.sd_model, required_prompts, steps)\n        using a cache to store the result if the same arguments have been used before.\n\n        cache is an array containing two elements. The first element is a tuple\n        representing the previously used arguments, or None if no arguments\n        have been used before. The second element is where the previously\n        computed result is stored.\n\n        caches is a list with items described above.\n        ';F=caches;D=hires_steps;C=steps;B=required_prompts
+		'\n        Returns the result of calling function(shared.sd_model, required_prompts, steps)\n        using a cache to store the result if the same arguments have been used before.\n\n        cache is an array containing two elements. The first element is a tuple\n        representing the previously used arguments, or None if no arguments\n        have been used before. The second element is where the previously\n        computed result is stored.\n\n        caches is a list with items described above.\n        ';F=caches;B=hires_steps;C=steps;D=required_prompts
 		if shared.opts.use_old_scheduling:
-			H=prompt_parser.get_learned_conditioning_prompt_schedules(B,C,D,_B);I=prompt_parser.get_learned_conditioning_prompt_schedules(B,C,D,_C)
+			H=prompt_parser.get_learned_conditioning_prompt_schedules(D,C,B,_B);I=prompt_parser.get_learned_conditioning_prompt_schedules(D,C,B,_C)
 			if H!=I:E.extra_generation_params['Old prompt editing timelines']=_C
-		G=E.cached_params(B,C,extra_network_data,D,shared.opts.use_old_scheduling)
+		G=E.cached_params(D,C,extra_network_data,B,shared.opts.use_old_scheduling)
 		for A in F:
 			if A[0]is not _A and G==A[0]:return A[1]
 		A=F[0]
-		with devices.autocast():A[1]=function(shared.sd_model,B,C,D,shared.opts.use_old_scheduling)
+		with devices.autocast():A[1]=function(shared.sd_model,D,C,B,shared.opts.use_old_scheduling)
 		A[0]=G;return A[1]
 	def setup_conds(A):D=prompt_parser.SdConditioning(A.prompts,width=A.width,height=A.height);E=prompt_parser.SdConditioning(A.negative_prompts,width=A.width,height=A.height,is_negative_prompt=_C);C=sd_samplers.find_sampler_config(A.sampler_name);B=C.total_steps(A.steps)if C else A.steps;A.step_multiplier=B//A.steps;A.firstpass_steps=B;A.uc=A.get_conds_with_caching(prompt_parser.get_learned_conditioning,E,B,[A.cached_uc],A.extra_network_data);A.c=A.get_conds_with_caching(prompt_parser.get_multicond_learned_conditioning,D,B,[A.cached_c],A.extra_network_data)
 	def get_conds(A):return A.c,A.uc
@@ -167,32 +167,32 @@ def program_version():
 	if A=='<none>':A=_A
 	return A
 def create_infotext(p,all_prompts,all_seeds,all_subseeds,comments=_A,iteration=0,position_in_batch=0,use_main_prompt=_B,index=_A,all_negative_prompts=_A):
-	C=all_negative_prompts;B=use_main_prompt;A=index
+	B=all_negative_prompts;C=use_main_prompt;A=index
 	if A is _A:A=position_in_batch+iteration*p.batch_size
-	if C is _A:C=p.all_negative_prompts
+	if B is _A:B=p.all_negative_prompts
 	E=getattr(p,_O,opts.CLIP_stop_at_last_layers);H=getattr(p,'enable_hr',_B);F=p.get_token_merging_ratio();G=p.get_token_merging_ratio(for_hr=_C);D=opts.eta_noise_seed_delta!=0
 	if D:D=sd_samplers_common.is_sampler_using_eta_noise_seed_delta(p)
-	I={'Steps':p.steps,'Sampler':p.sampler_name,'CFG scale':p.cfg_scale,'Image CFG scale':getattr(p,_N,_A),'Seed':p.all_seeds[0]if B else all_seeds[A],'Face restoration':opts.face_restoration_model if p.restore_faces else _A,'Size':f"{p.width}x{p.height}",'Model hash':p.sd_model_hash if opts.add_model_hash_to_info else _A,'Model':p.sd_model_name if opts.add_model_name_to_info else _A,'VAE hash':p.sd_vae_hash if opts.add_model_hash_to_info else _A,'VAE':p.sd_vae_name if opts.add_model_name_to_info else _A,'Variation seed':_A if p.subseed_strength==0 else p.all_subseeds[0]if B else all_subseeds[A],'Variation seed strength':_A if p.subseed_strength==0 else p.subseed_strength,'Seed resize from':_A if p.seed_resize_from_w<=0 or p.seed_resize_from_h<=0 else f"{p.seed_resize_from_w}x{p.seed_resize_from_h}",'Denoising strength':getattr(p,_K,_A),'Conditional mask weight':getattr(p,_J,shared.opts.inpainting_mask_weight)if p.is_using_inpainting_conditioning else _A,'Clip skip':_A if E<=1 else E,'ENSD':opts.eta_noise_seed_delta if D else _A,'Token merging ratio':_A if F==0 else F,'Token merging ratio hr':_A if not H or G==0 else G,'Init image hash':getattr(p,'init_img_hash',_A),'RNG':opts.randn_source if opts.randn_source!='GPU'else _A,'NGMS':_A if p.s_min_uncond==0 else p.s_min_uncond,'Tiling':'True'if p.tiling else _A,**p.extra_generation_params,'Version':program_version()if opts.add_version_to_infotext else _A,'User':p.user if opts.add_user_name_to_info else _A};J=', '.join([A if A==B else f"{A}: {generation_parameters_copypaste.quote(B)}"for(A,B)in I.items()if B is not _A]);K=p.main_prompt if B else all_prompts[A];L=f"\nNegative prompt: {p.main_negative_prompt if B else C[A]}"if C[A]else'';return f"{K}{L}\n{J}".strip()
+	I={'Steps':p.steps,'Sampler':p.sampler_name,'CFG scale':p.cfg_scale,'Image CFG scale':getattr(p,_N,_A),'Seed':p.all_seeds[0]if C else all_seeds[A],'Face restoration':opts.face_restoration_model if p.restore_faces else _A,'Size':f"{p.width}x{p.height}",'Model hash':p.sd_model_hash if opts.add_model_hash_to_info else _A,'Model':p.sd_model_name if opts.add_model_name_to_info else _A,'VAE hash':p.sd_vae_hash if opts.add_model_hash_to_info else _A,'VAE':p.sd_vae_name if opts.add_model_name_to_info else _A,'Variation seed':_A if p.subseed_strength==0 else p.all_subseeds[0]if C else all_subseeds[A],'Variation seed strength':_A if p.subseed_strength==0 else p.subseed_strength,'Seed resize from':_A if p.seed_resize_from_w<=0 or p.seed_resize_from_h<=0 else f"{p.seed_resize_from_w}x{p.seed_resize_from_h}",'Denoising strength':getattr(p,_K,_A),'Conditional mask weight':getattr(p,_J,shared.opts.inpainting_mask_weight)if p.is_using_inpainting_conditioning else _A,'Clip skip':_A if E<=1 else E,'ENSD':opts.eta_noise_seed_delta if D else _A,'Token merging ratio':_A if F==0 else F,'Token merging ratio hr':_A if not H or G==0 else G,'Init image hash':getattr(p,'init_img_hash',_A),'RNG':opts.randn_source if opts.randn_source!='GPU'else _A,'NGMS':_A if p.s_min_uncond==0 else p.s_min_uncond,'Tiling':'True'if p.tiling else _A,**p.extra_generation_params,'Version':program_version()if opts.add_version_to_infotext else _A,'User':p.user if opts.add_user_name_to_info else _A};J=', '.join([A if A==B else f"{A}: {generation_parameters_copypaste.quote(B)}"for(A,B)in I.items()if B is not _A]);K=p.main_prompt if C else all_prompts[A];L=f"\nNegative prompt: {p.main_negative_prompt if C else B[A]}"if B[A]else'';return f"{K}{L}\n{J}".strip()
 def process_images(p):
-	D='sd_vae';C='sd_model_checkpoint'
+	D='sd_vae';B='sd_model_checkpoint'
 	if p.scripts is not _A:p.scripts.before_process(p)
 	E={A:opts.data[A]for A in p.override_settings.keys()}
 	try:
-		if sd_models.checkpoint_aliases.get(p.override_settings.get(C))is _A:p.override_settings.pop(C,_A);sd_models.reload_model_weights()
-		for(A,B)in p.override_settings.items():
-			opts.set(A,B,is_api=_C,run_callbacks=_B)
-			if A==C:sd_models.reload_model_weights()
+		if sd_models.checkpoint_aliases.get(p.override_settings.get(B))is _A:p.override_settings.pop(B,_A);sd_models.reload_model_weights()
+		for(A,C)in p.override_settings.items():
+			opts.set(A,C,is_api=_C,run_callbacks=_B)
+			if A==B:sd_models.reload_model_weights()
 			if A==D:sd_vae.reload_vae_weights()
 		sd_models.apply_token_merging(p.sd_model,p.get_token_merging_ratio());F=process_images_inner(p)
 	finally:
 		sd_models.apply_token_merging(p.sd_model,0)
 		if p.override_settings_restore_afterwards:
-			for(A,B)in E.items():
-				setattr(opts,A,B)
+			for(A,C)in E.items():
+				setattr(opts,A,C)
 				if A==D:sd_vae.reload_vae_weights()
 	return F
 def process_images_inner(p):
-	'this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch';U='parameters'
+	'this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch';O='parameters'
 	if isinstance(p.prompt,list):assert len(p.prompt)>0
 	else:assert p.prompt is not _A
 	devices.torch_gc();L=get_fixed_seed(p.seed);M=get_fixed_seed(p.subseed)
@@ -240,7 +240,7 @@ def process_images_inner(p):
 			D=torch.stack(D).float();D=torch.clamp((D+_D)/2.,min=.0,max=_D);del J
 			if lowvram.is_enabled(shared.sd_model):lowvram.send_everything_to_cpu()
 			devices.torch_gc()
-			if p.scripts is not _A:p.scripts.postprocess_batch(p,D,batch_number=B);p.prompts=p.all_prompts[B*p.batch_size:(B+1)*p.batch_size];p.negative_prompts=p.all_negative_prompts[B*p.batch_size:(B+1)*p.batch_size];O=scripts.PostprocessBatchListArgs(list(D));p.scripts.postprocess_batch_list(p,O,batch_number=B);D=O.images
+			if p.scripts is not _A:p.scripts.postprocess_batch(p,D,batch_number=B);p.prompts=p.all_prompts[B*p.batch_size:(B+1)*p.batch_size];p.negative_prompts=p.all_negative_prompts[B*p.batch_size:(B+1)*p.batch_size];P=scripts.PostprocessBatchListArgs(list(D));p.scripts.postprocess_batch_list(p,P,batch_number=B);D=P.images
 			def E(index=0,use_main_prompt=_B):return create_infotext(p,p.prompts,p.seeds,p.subseeds,use_main_prompt=use_main_prompt,index=index,all_negative_prompts=p.negative_prompts)
 			K=p.save_samples()
 			for(A,F)in enumerate(D):
@@ -249,35 +249,35 @@ def process_images_inner(p):
 					if K and opts.save_images_before_face_restoration:images.save_image(Image.fromarray(F),p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-before-face-restoration')
 					devices.torch_gc();F=modules.face_restoration.restore_faces(F);devices.torch_gc()
 				C=Image.fromarray(F)
-				if p.scripts is not _A:P=scripts.PostprocessImageArgs(C);p.scripts.postprocess_image(p,P);C=P.image
+				if p.scripts is not _A:Q=scripts.PostprocessImageArgs(C);p.scripts.postprocess_image(p,Q);C=Q.image
 				if p.color_corrections is not _A and A<len(p.color_corrections):
 					if K and opts.save_images_before_color_correction:Y=apply_overlay(C,p.paste_to,A,p.overlay_images);images.save_image(Y,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-before-color-correction')
 					C=apply_color_correction(p.color_corrections[A],C)
 				C=apply_overlay(C,p.paste_to,A,p.overlay_images)
 				if K:images.save_image(C,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p)
 				H=E(A);I.append(H)
-				if opts.enable_pnginfo:C.info[U]=H
+				if opts.enable_pnginfo:C.info[O]=H
 				G.append(C)
 				if K and hasattr(p,'mask_for_overlay')and p.mask_for_overlay and any([opts.save_mask,opts.save_mask_composite,opts.return_mask,opts.return_mask_composite]):
-					Q=p.mask_for_overlay.convert(_F);R=Image.composite(C.convert(_E).convert(_G),Image.new(_G,C.size),images.resize_image(2,p.mask_for_overlay,C.width,C.height).convert('L')).convert(_E)
-					if opts.save_mask:images.save_image(Q,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-mask')
-					if opts.save_mask_composite:images.save_image(R,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-mask-composite')
-					if opts.return_mask:G.append(Q)
-					if opts.return_mask_composite:G.append(R)
+					R=p.mask_for_overlay.convert(_F);S=Image.composite(C.convert(_E).convert(_G),Image.new(_G,C.size),images.resize_image(2,p.mask_for_overlay,C.width,C.height).convert('L')).convert(_E)
+					if opts.save_mask:images.save_image(R,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-mask')
+					if opts.save_mask_composite:images.save_image(S,p.outpath_samples,'',p.seeds[A],p.prompts[A],opts.samples_format,info=E(A),p=p,suffix='-mask-composite')
+					if opts.return_mask:G.append(R)
+					if opts.return_mask_composite:G.append(S)
 			del D;devices.torch_gc();state.nextjob()
-		p.color_corrections=_A;S=0;Z=len(G)<2 and opts.grid_only_if_multiple
+		p.color_corrections=_A;T=0;Z=len(G)<2 and opts.grid_only_if_multiple
 		if(opts.return_grid or opts.grid_save)and not p.do_not_save_grid and not Z:
 			N=images.image_grid(G,p.batch_size)
 			if opts.return_grid:
 				H=E(use_main_prompt=_C);I.insert(0,H)
-				if opts.enable_pnginfo:N.info[U]=H
-				G.insert(0,N);S=1
+				if opts.enable_pnginfo:N.info[O]=H
+				G.insert(0,N);T=1
 			if opts.grid_save:images.save_image(N,p.outpath_grids,'grid',p.all_seeds[0],p.all_prompts[0],opts.grid_format,info=E(use_main_prompt=_C),short_filename=not opts.grid_extended_filename,p=p,grid=_C)
 	if not p.disable_extra_networks and p.extra_network_data:extra_networks.deactivate(p,p.extra_network_data)
-	devices.torch_gc();T=Processed(p,images_list=G,seed=p.all_seeds[0],info=I[0],subseed=p.all_subseeds[0],index_of_first_image=S,infotexts=I)
-	if p.scripts is not _A:p.scripts.postprocess(p,T)
-	return T
-def old_hires_fix_first_pass_dimensions(width,height):'old algorithm for auto-calculating first pass size';B=height;A=width;D=512*512;E=A*B;C=math.sqrt(D/E);A=math.ceil(C*A/64)*64;B=math.ceil(C*B/64)*64;return A,B
+	devices.torch_gc();U=Processed(p,images_list=G,seed=p.all_seeds[0],info=I[0],subseed=p.all_subseeds[0],index_of_first_image=T,infotexts=I)
+	if p.scripts is not _A:p.scripts.postprocess(p,U)
+	return U
+def old_hires_fix_first_pass_dimensions(width,height):'old algorithm for auto-calculating first pass size';A=height;B=width;D=512*512;E=B*A;C=math.sqrt(D/E);B=math.ceil(C*B/64)*64;A=math.ceil(C*A/64)*64;return B,A
 @dataclass(repr=_B)
 class StandardDemoProcessingTxt2Img(StandardDemoProcessing):
 	enable_hr:bool=_B;denoising_strength:float=.75;firstphase_width:int=0;firstphase_height:int=0;hr_scale:float=2.;hr_upscaler:str=_A;hr_second_pass_steps:int=0;hr_resize_x:int=0;hr_resize_y:int=0;hr_checkpoint_name:str=_A;hr_sampler_name:str=_A;hr_prompt:str='';hr_negative_prompt:str='';cached_hr_uc=[_A,_A];cached_hr_c=[_A,_A];hr_checkpoint_info:dict=field(default=_A,init=_B);hr_upscale_to_x:int=field(default=0,init=_B);hr_upscale_to_y:int=field(default=0,init=_B);truncate_x:int=field(default=0,init=_B);truncate_y:int=field(default=0,init=_B);applied_old_hires_behavior_to:tuple=field(default=_A,init=_B);latent_scale_mode:dict=field(default=_A,init=_B);hr_c:tuple|_A=field(default=_A,init=_B);hr_uc:tuple|_A=field(default=_A,init=_B);all_hr_prompts:list=field(default=_A,init=_B);all_hr_negative_prompts:list=field(default=_A,init=_B);hr_prompts:list=field(default=_A,init=_B);hr_negative_prompts:list=field(default=_A,init=_B);hr_extra_network_data:list=field(default=_A,init=_B)
@@ -327,10 +327,10 @@ class StandardDemoProcessingTxt2Img(StandardDemoProcessing):
 		if shared.state.interrupted:return B
 		A.is_hr_pass=_C;H=A.hr_upscale_to_x;I=A.hr_upscale_to_y
 		def J(image,index):
-			'saves image before applying hires fix, if enabled in options; takes as an argument either an image or batch with latent space images';C=index;B=image
+			'saves image before applying hires fix, if enabled in options; takes as an argument either an image or batch with latent space images';B=index;C=image
 			if not A.save_samples()or not opts.save_images_before_highres_fix:return
-			if not isinstance(B,Image.Image):B=sd_samplers.sample_to_image(B,C,approximation=0)
-			D=create_infotext(A,A.all_prompts,A.all_seeds,A.all_subseeds,[],iteration=A.iteration,position_in_batch=C);images.save_image(B,A.outpath_samples,'',seeds[C],prompts[C],opts.samples_format,info=D,p=A,suffix='-before-highres-fix')
+			if not isinstance(C,Image.Image):C=sd_samplers.sample_to_image(C,B,approximation=0)
+			D=create_infotext(A,A.all_prompts,A.all_seeds,A.all_subseeds,[],iteration=A.iteration,position_in_batch=B);images.save_image(C,A.outpath_samples,'',seeds[B],prompts[B],opts.samples_format,info=D,p=A,suffix='-before-highres-fix')
 		L=A.hr_sampler_name or A.sampler_name;A.sampler=sd_samplers.create_sampler(L,A.sd_model)
 		if A.latent_scale_mode is not _A:
 			for F in range(B.shape[0]):J(B,F)

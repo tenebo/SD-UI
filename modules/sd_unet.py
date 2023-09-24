@@ -6,9 +6,9 @@ current_unet_option=_A
 current_unet=_A
 def list_unets():A=script_callbacks.list_unets_callback();unet_options.clear();unet_options.extend(A)
 def get_unet_option(option=_A):
-	C='None';A=option;A=A or shared.opts.sd_unet
-	if A==C:return
-	if A=='Automatic':D=shared.sd_model.sd_checkpoint_info.model_name;B=[A for A in unet_options if A.model_name==D];A=B[0].label if B else C
+	B='None';A=option;A=A or shared.opts.sd_unet
+	if A==B:return
+	if A=='Automatic':D=shared.sd_model.sd_checkpoint_info.model_name;C=[A for A in unet_options if A.model_name==D];A=C[0].label if C else B
 	return next(iter([B for B in unet_options if B.label==A]),_A)
 def apply_unet(option=_A):
 	global current_unet_option;global current_unet;A=get_unet_option(option)
@@ -27,7 +27,7 @@ class SdUnet(torch.nn.Module):
 	def forward(A,x,timesteps,context,*B,**C):raise NotImplementedError()
 	def activate(A):0
 	def deactivate(A):0
-def UNetModel_forward(self,x,timesteps=_A,context=_A,*C,**D):
-	B=context;A=timesteps
-	if current_unet is not _A:return current_unet.forward(x,A,B,*C,**D)
-	return ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_webui(self,x,A,B,*C,**D)
+def UNetModel_forward(self,x,timesteps=_A,context=_A,*A,**B):
+	C=context;D=timesteps
+	if current_unet is not _A:return current_unet.forward(x,D,C,*A,**B)
+	return ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_webui(self,x,D,C,*A,**B)

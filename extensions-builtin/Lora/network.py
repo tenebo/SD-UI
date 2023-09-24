@@ -40,9 +40,9 @@ class ModuleType:
 	def create_module(A,net,weights):0
 class NetworkModule:
 	def __init__(A,net,weights):
-		D='scale';C='alpha';B=weights;A.network=net;A.network_key=B.network_key;A.sd_key=B.sd_key;A.sd_module=B.sd_module
+		C='scale';D='alpha';B=weights;A.network=net;A.network_key=B.network_key;A.sd_key=B.sd_key;A.sd_module=B.sd_module
 		if hasattr(A.sd_module,'weight'):A.shape=A.sd_module.weight.shape
-		A.dim=_A;A.bias=B.w.get('bias');A.alpha=B.w[C].item()if C in B.w else _A;A.scale=B.w[D].item()if D in B.w else _A
+		A.dim=_A;A.bias=B.w.get('bias');A.alpha=B.w[D].item()if D in B.w else _A;A.scale=B.w[C].item()if C in B.w else _A
 	def multiplier(A):
 		if'transformer'in A.sd_key[:20]:return A.network.te_multiplier
 		else:return A.network.unet_multiplier
@@ -51,11 +51,11 @@ class NetworkModule:
 		if A.dim is not _A and A.alpha is not _A:return A.alpha/A.dim
 		return 1.
 	def finalize_updown(B,updown,orig_weight,output_shape,ex_bias=_A):
-		E=output_shape;D=ex_bias;C=orig_weight;A=updown
-		if B.bias is not _A:A=A.reshape(B.bias.shape);A+=B.bias.to(C.device,dtype=C.dtype);A=A.reshape(E)
+		E=output_shape;C=ex_bias;D=orig_weight;A=updown
+		if B.bias is not _A:A=A.reshape(B.bias.shape);A+=B.bias.to(D.device,dtype=D.dtype);A=A.reshape(E)
 		if len(E)==4:A=A.reshape(E)
-		if C.size().numel()==A.size().numel():A=A.reshape(C.shape)
-		if D is not _A:D=D*B.multiplier()
-		return A*B.calc_scale()*B.multiplier(),D
+		if D.size().numel()==A.size().numel():A=A.reshape(D.shape)
+		if C is not _A:C=C*B.multiplier()
+		return A*B.calc_scale()*B.multiplier(),C
 	def calc_updown(A,target):raise NotImplementedError()
 	def forward(A,x,y):raise NotImplementedError()

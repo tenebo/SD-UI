@@ -25,21 +25,21 @@ def extract_style_text_from_prompt(style_text,prompt):
 		return _A,A
 	return _C,A
 def extract_style_from_prompts(style,prompt,negative_prompt):
-	C=negative_prompt;B=prompt;A=style
-	if not A.prompt and not A.negative_prompt:return _C,B,C
-	D,E=extract_style_text_from_prompt(A.prompt,B)
-	if not D:return _C,B,C
-	F,G=extract_style_text_from_prompt(A.negative_prompt,C)
-	if not F:return _C,B,C
+	A=negative_prompt;B=prompt;C=style
+	if not C.prompt and not C.negative_prompt:return _C,B,A
+	D,E=extract_style_text_from_prompt(C.prompt,B)
+	if not D:return _C,B,A
+	F,G=extract_style_text_from_prompt(C.negative_prompt,A)
+	if not F:return _C,B,A
 	return _A,E,G
 class StyleDatabase:
 	def __init__(A,path):A.no_style=PromptStyle('None','','');A.styles={};A.path=path;A.reload()
 	def reload(B):
-		D='name';C='prompt';B.styles.clear()
+		C='name';D='prompt';B.styles.clear()
 		if not os.path.exists(B.path):return
 		with open(B.path,'r',encoding=_D,newline='')as E:
 			F=csv.DictReader(E,skipinitialspace=_A)
-			for A in F:G=A[C]if C in A else A['text'];H=A.get('negative_prompt','');B.styles[A[D]]=PromptStyle(A[D],G,H)
+			for A in F:G=A[D]if D in A else A['text'];H=A.get('negative_prompt','');B.styles[A[C]]=PromptStyle(A[C],G,H)
 	def get_style_prompts(A,styles):return[A.styles.get(B,A.no_style).prompt for B in styles]
 	def get_negative_style_prompts(A,styles):return[A.styles.get(B,A.no_style).negative_prompt for B in styles]
 	def apply_styles_to_prompt(A,prompt,styles):return apply_styles_to_prompt(prompt,[A.styles.get(B,A.no_style).prompt for B in styles])
@@ -49,12 +49,12 @@ class StyleDatabase:
 		if os.path.exists(A):shutil.copy(A,f"{A}.bak")
 		with open(A,'w',encoding=_D,newline='')as D:B=csv.DictWriter(D,fieldnames=PromptStyle._fields);B.writeheader();B.writerows(A._asdict()for(B,A)in C.styles.items())
 	def extract_styles_from_prompt(G,prompt,negative_prompt):
-		C=negative_prompt;B=prompt;D=[];E=list(G.styles.values())
+		B=negative_prompt;C=prompt;D=[];E=list(G.styles.values())
 		while _A:
 			A=None
 			for F in E:
-				H,I,J=extract_style_from_prompts(F,B,C)
-				if H:A=F;B=I;C=J;break
+				H,I,J=extract_style_from_prompts(F,C,B)
+				if H:A=F;C=I;B=J;break
 			if not A:break
 			E.remove(A);D.append(A.name)
-		return list(reversed(D)),B,C
+		return list(reversed(D)),C,B

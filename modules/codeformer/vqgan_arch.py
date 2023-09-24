@@ -69,25 +69,25 @@ class Generator(nn.Module):
 @ARCH_REGISTRY.register()
 class VQAutoEncoder(nn.Module):
 	def __init__(A,img_size,nf,ch_mult,quantizer=_F,res_blocks=2,attn_resolutions=_A,codebook_size=1024,emb_dim=256,beta=.25,gumbel_straight_through=_D,gumbel_kl_weight=1e-08,model_path=_A):
-		F='params_ema';C=emb_dim;B=model_path;super().__init__();D=get_root_logger();A.in_channels=3;A.nf=nf;A.n_blocks=res_blocks;A.codebook_size=codebook_size;A.embed_dim=C;A.ch_mult=ch_mult;A.resolution=img_size;A.attn_resolutions=attn_resolutions or[16];A.quantizer_type=quantizer;A.encoder=Encoder(A.in_channels,A.nf,A.embed_dim,A.ch_mult,A.n_blocks,A.resolution,A.attn_resolutions)
+		C='params_ema';D=emb_dim;B=model_path;super().__init__();E=get_root_logger();A.in_channels=3;A.nf=nf;A.n_blocks=res_blocks;A.codebook_size=codebook_size;A.embed_dim=D;A.ch_mult=ch_mult;A.resolution=img_size;A.attn_resolutions=attn_resolutions or[16];A.quantizer_type=quantizer;A.encoder=Encoder(A.in_channels,A.nf,A.embed_dim,A.ch_mult,A.n_blocks,A.resolution,A.attn_resolutions)
 		if A.quantizer_type==_F:A.beta=beta;A.quantize=VectorQuantizer(A.codebook_size,A.embed_dim,A.beta)
-		elif A.quantizer_type=='gumbel':A.gumbel_num_hiddens=C;A.straight_through=gumbel_straight_through;A.kl_weight=gumbel_kl_weight;A.quantize=GumbelQuantizer(A.codebook_size,A.embed_dim,A.gumbel_num_hiddens,A.straight_through,A.kl_weight)
+		elif A.quantizer_type=='gumbel':A.gumbel_num_hiddens=D;A.straight_through=gumbel_straight_through;A.kl_weight=gumbel_kl_weight;A.quantize=GumbelQuantizer(A.codebook_size,A.embed_dim,A.gumbel_num_hiddens,A.straight_through,A.kl_weight)
 		A.generator=Generator(A.nf,A.embed_dim,A.ch_mult,A.n_blocks,A.resolution,A.attn_resolutions)
 		if B is not _A:
-			E=torch.load(B,map_location=_C)
-			if F in E:A.load_state_dict(torch.load(B,map_location=_C)[F]);D.info(f"vqgan is loaded from: {B} [params_ema]")
-			elif _E in E:A.load_state_dict(torch.load(B,map_location=_C)[_E]);D.info(f"vqgan is loaded from: {B} [params]")
+			F=torch.load(B,map_location=_C)
+			if C in F:A.load_state_dict(torch.load(B,map_location=_C)[C]);E.info(f"vqgan is loaded from: {B} [params_ema]")
+			elif _E in F:A.load_state_dict(torch.load(B,map_location=_C)[_E]);E.info(f"vqgan is loaded from: {B} [params]")
 			else:raise ValueError(_H)
 	def forward(A,x):x=A.encoder(x);B,C,D=A.quantize(x);x=A.generator(B);return x,C,D
 @ARCH_REGISTRY.register()
 class VQGANDiscriminator(nn.Module):
 	def __init__(F,nc=3,ndf=64,n_layers=4,model_path=_A):
-		I='params_d';G=n_layers;C=model_path;B=ndf;super().__init__();D=[nn.Conv2d(nc,B,kernel_size=4,stride=2,padding=1),nn.LeakyReLU(.2,_B)];A=1;E=1
-		for J in range(1,G):E=A;A=min(2**J,8);D+=[nn.Conv2d(B*E,B*A,kernel_size=4,stride=2,padding=1,bias=_D),nn.BatchNorm2d(B*A),nn.LeakyReLU(.2,_B)]
-		E=A;A=min(2**G,8);D+=[nn.Conv2d(B*E,B*A,kernel_size=4,stride=1,padding=1,bias=_D),nn.BatchNorm2d(B*A),nn.LeakyReLU(.2,_B)];D+=[nn.Conv2d(B*A,1,kernel_size=4,stride=1,padding=1)];F.main=nn.Sequential(*D)
+		G='params_d';H=n_layers;C=model_path;B=ndf;super().__init__();D=[nn.Conv2d(nc,B,kernel_size=4,stride=2,padding=1),nn.LeakyReLU(.2,_B)];A=1;E=1
+		for J in range(1,H):E=A;A=min(2**J,8);D+=[nn.Conv2d(B*E,B*A,kernel_size=4,stride=2,padding=1,bias=_D),nn.BatchNorm2d(B*A),nn.LeakyReLU(.2,_B)]
+		E=A;A=min(2**H,8);D+=[nn.Conv2d(B*E,B*A,kernel_size=4,stride=1,padding=1,bias=_D),nn.BatchNorm2d(B*A),nn.LeakyReLU(.2,_B)];D+=[nn.Conv2d(B*A,1,kernel_size=4,stride=1,padding=1)];F.main=nn.Sequential(*D)
 		if C is not _A:
-			H=torch.load(C,map_location=_C)
-			if I in H:F.load_state_dict(torch.load(C,map_location=_C)[I])
-			elif _E in H:F.load_state_dict(torch.load(C,map_location=_C)[_E])
+			I=torch.load(C,map_location=_C)
+			if G in I:F.load_state_dict(torch.load(C,map_location=_C)[G])
+			elif _E in I:F.load_state_dict(torch.load(C,map_location=_C)[_E])
 			else:raise ValueError(_H)
 	def forward(A,x):return A.main(x)

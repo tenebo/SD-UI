@@ -30,19 +30,19 @@ class UpscalerSwinIR(Upscaler):
 			if E:A=torch.compile(A);B._cached_model=A;B._cached_model_config=F
 		C=upscale(C,A);devices.torch_gc();return C
 	def load_model(E,path,scale=4):
-		H='nearest+conv';F=scale;B=path
+		F='nearest+conv';G=scale;B=path
 		if B.startswith('http'):C=modelloader.load_file_from_url(url=B,model_dir=E.model_download_path,file_name=f"{E.model_name.replace(' ','_')}.pth")
 		else:C=B
-		if C.endswith('.v2.pth'):A=Swin2SR(upscale=F,in_chans=3,img_size=64,window_size=8,img_range=1.,depths=[6,6,6,6,6,6],embed_dim=180,num_heads=[6,6,6,6,6,6],mlp_ratio=2,upsampler=H,resi_connection='1conv');D=_A
-		else:A=SwinIR(upscale=F,in_chans=3,img_size=64,window_size=8,img_range=1.,depths=[6,6,6,6,6,6,6,6,6],embed_dim=240,num_heads=[8,8,8,8,8,8,8,8,8],mlp_ratio=2,upsampler=H,resi_connection='3conv');D='params_ema'
-		G=torch.load(C)
-		if D is not _A:A.load_state_dict(G[D],strict=True)
-		else:A.load_state_dict(G,strict=True)
+		if C.endswith('.v2.pth'):A=Swin2SR(upscale=G,in_chans=3,img_size=64,window_size=8,img_range=1.,depths=[6,6,6,6,6,6],embed_dim=180,num_heads=[6,6,6,6,6,6],mlp_ratio=2,upsampler=F,resi_connection='1conv');D=_A
+		else:A=SwinIR(upscale=G,in_chans=3,img_size=64,window_size=8,img_range=1.,depths=[6,6,6,6,6,6,6,6,6],embed_dim=240,num_heads=[8,8,8,8,8,8,8,8,8],mlp_ratio=2,upsampler=F,resi_connection='3conv');D='params_ema'
+		H=torch.load(C)
+		if D is not _A:A.load_state_dict(H[D],strict=True)
+		else:A.load_state_dict(H,strict=True)
 		return A
 def upscale(img,model,tile=_A,tile_overlap=_A,window_size=8,scale=4):
-	H=scale;G=tile_overlap;F=tile;C=window_size;A=img;F=F or opts.SWIN_tile;G=G or opts.SWIN_tile_overlap;A=np.array(A);A=A[:,:,::-1];A=np.moveaxis(A,2,0)/255;A=torch.from_numpy(A).float();A=A.unsqueeze(0).to(device_swinir,dtype=devices.dtype)
+	F=scale;G=tile_overlap;H=tile;C=window_size;A=img;H=H or opts.SWIN_tile;G=G or opts.SWIN_tile_overlap;A=np.array(A);A=A[:,:,::-1];A=np.moveaxis(A,2,0)/255;A=torch.from_numpy(A).float();A=A.unsqueeze(0).to(device_swinir,dtype=devices.dtype)
 	with torch.no_grad(),devices.autocast():
-		I,I,D,E=A.size();J=(D//C+1)*C-D;K=(E//C+1)*C-E;A=torch.cat([A,torch.flip(A,[2])],2)[:,:,:D+J,:];A=torch.cat([A,torch.flip(A,[3])],3)[:,:,:,:E+K];B=inference(A,model,F,G,C,H);B=B[...,:D*H,:E*H];B=B.data.squeeze().float().cpu().clamp_(0,1).numpy()
+		I,I,D,E=A.size();J=(D//C+1)*C-D;K=(E//C+1)*C-E;A=torch.cat([A,torch.flip(A,[2])],2)[:,:,:D+J,:];A=torch.cat([A,torch.flip(A,[3])],3)[:,:,:,:E+K];B=inference(A,model,H,G,C,F);B=B[...,:D*F,:E*F];B=B.data.squeeze().float().cpu().clamp_(0,1).numpy()
 		if B.ndim==3:B=np.transpose(B[[2,1,0],:,:],(1,2,0))
 		B=(B*255.).round().astype(np.uint8);return Image.fromarray(B,'RGB')
 def inference(img,model,tile,tile_overlap,window_size,scale):
@@ -55,6 +55,6 @@ def inference(img,model,tile,tile_overlap,window_size,scale):
 				Q=G[...,C:C+A,D:D+A];M=model(Q);R=torch.ones_like(M);H[...,C*B:(C+A)*B,D*B:(D+A)*B].add_(M);L[...,C*B:(C+A)*B,D*B:(D+A)*B].add_(R);P.update(1)
 	S=H.div_(L);return S
 def on_ui_settings():
-	F='step';E='maximum';D='minimum';C='Upscaling';B='upscaling';import gradio as A;shared.opts.add_option('SWIN_tile',shared.OptionInfo(192,'Tile size for all SwinIR.',A.Slider,{D:16,E:512,F:16},section=(B,C)));shared.opts.add_option('SWIN_tile_overlap',shared.OptionInfo(8,'Tile overlap, in pixels for SwinIR. Low values = visible seam.',A.Slider,{D:0,E:48,F:1},section=(B,C)))
-	if int(torch.__version__.split('.')[0])>=2 and platform.system()!=_C:shared.opts.add_option(_B,shared.OptionInfo(False,'Use torch.compile to accelerate SwinIR.',A.Checkbox,{'interactive':True},section=(B,C)).info('Takes longer on first run'))
+	D='step';E='maximum';F='minimum';A='Upscaling';B='upscaling';import gradio as C;shared.opts.add_option('SWIN_tile',shared.OptionInfo(192,'Tile size for all SwinIR.',C.Slider,{F:16,E:512,D:16},section=(B,A)));shared.opts.add_option('SWIN_tile_overlap',shared.OptionInfo(8,'Tile overlap, in pixels for SwinIR. Low values = visible seam.',C.Slider,{F:0,E:48,D:1},section=(B,A)))
+	if int(torch.__version__.split('.')[0])>=2 and platform.system()!=_C:shared.opts.add_option(_B,shared.OptionInfo(False,'Use torch.compile to accelerate SwinIR.',C.Checkbox,{'interactive':True},section=(B,A)).info('Takes longer on first run'))
 script_callbacks.on_ui_settings(on_ui_settings)

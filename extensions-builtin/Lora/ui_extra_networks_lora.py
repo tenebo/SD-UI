@@ -6,10 +6,10 @@ class ExtraNetworksPageLora(ui_extra_networks.ExtraNetworksPage):
 	def __init__(A):super().__init__('Lora')
 	def refresh(A):networks.list_available_networks()
 	def create_item(D,name,index=None,enable_filter=True):
-		K='prompt';J='sd_version';G=' + ';F='user_metadata';A=networks.available_networks.get(name);E,N=os.path.splitext(A.filename);L=A.get_alias();C={'name':name,'filename':A.filename,'shorthash':A.shorthash,'preview':D.find_preview(E),'description':D.find_description(E),'search_term':D.search_terms_from_path(A.filename)+' '+(A.hash or''),'local_preview':f"{E}.{shared.opts.samples_format}",'metadata':A.metadata,'sort_keys':{'default':index,**D.get_sort_keys(A.filename)},J:A.sd_version.name};D.read_user_metadata(C);H=C[F].get('activation text');I=C[F].get('preferred weight',.0);C[K]=quote_js(f"<lora:{L}:")+G+(str(I)if I else'opts.extra_networks_default_multiplier')+G+quote_js('>')
-		if H:C[K]+=G+quote_js(' '+H)
+		H='prompt';I='sd_version';E=' + ';F='user_metadata';A=networks.available_networks.get(name);G,N=os.path.splitext(A.filename);L=A.get_alias();C={'name':name,'filename':A.filename,'shorthash':A.shorthash,'preview':D.find_preview(G),'description':D.find_description(G),'search_term':D.search_terms_from_path(A.filename)+' '+(A.hash or''),'local_preview':f"{G}.{shared.opts.samples_format}",'metadata':A.metadata,'sort_keys':{'default':index,**D.get_sort_keys(A.filename)},I:A.sd_version.name};D.read_user_metadata(C);J=C[F].get('activation text');K=C[F].get('preferred weight',.0);C[H]=quote_js(f"<lora:{L}:")+E+(str(K)if K else'opts.extra_networks_default_multiplier')+E+quote_js('>')
+		if J:C[H]+=E+quote_js(' '+J)
 		B=C[F].get('sd version')
-		if B in network.SdVersion.__members__:C[J]=B;B=network.SdVersion[B]
+		if B in network.SdVersion.__members__:C[I]=B;B=network.SdVersion[B]
 		else:B=A.sd_version
 		if shared.opts.lora_show_all or not enable_filter:0
 		elif B==network.SdVersion.Unknown:

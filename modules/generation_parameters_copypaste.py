@@ -34,19 +34,19 @@ def unquote(text):
 	try:return json.loads(A)
 	except Exception:return A
 def image_from_url_text(filedata):
-	D='data:image/png;base64,';C='is_file';A=filedata
+	C='data:image/png;base64,';D='is_file';A=filedata
 	if A is _A:return
-	if type(A)==list and A and type(A[0])==dict and A[0].get(C,_B):A=A[0]
-	if type(A)==dict and A.get(C,_B):B=A['name'];E=ui_tempdir.check_tmp_file(shared.demo,B);assert E,'trying to open image file outside of allowed directories';B=B.rsplit('?',1)[0];return Image.open(B)
+	if type(A)==list and A and type(A[0])==dict and A[0].get(D,_B):A=A[0]
+	if type(A)==dict and A.get(D,_B):B=A['name'];E=ui_tempdir.check_tmp_file(shared.demo,B);assert E,'trying to open image file outside of allowed directories';B=B.rsplit('?',1)[0];return Image.open(B)
 	if type(A)==list:
 		if len(A)==0:return
 		A=A[0]
-	if A.startswith(D):A=A[len(D):]
+	if A.startswith(C):A=A[len(C):]
 	A=base64.decodebytes(A.encode('utf-8'));F=Image.open(io.BytesIO(A));return F
 def add_paste_fields(tabname,init_img,fields,override_settings_component=_A):
-	B=fields;A=tabname;paste_fields[A]={_J:init_img,_G:B,_K:override_settings_component};import modules.ui
-	if A=='txt2img':modules.ui.txt2img_paste_fields=B
-	elif A=='img2img':modules.ui.img2img_paste_fields=B
+	A=fields;B=tabname;paste_fields[B]={_J:init_img,_G:A,_K:override_settings_component};import modules.ui
+	if B=='txt2img':modules.ui.txt2img_paste_fields=A
+	elif B=='img2img':modules.ui.img2img_paste_fields=A
 def create_buttons(tabs_list):
 	B={}
 	for A in tabs_list:B[A]=gr.Button(f"Send to {A}",elem_id=f"{A}_tab")
@@ -82,17 +82,17 @@ def restore_old_hires_fix_params(res):
 	if B==0 or C==0:B,C=processing.old_hires_fix_first_pass_dimensions(F,G)
 	A[_D]=B;A[_E]=C;A[_F]=F;A[_I]=G
 def parse_generation_parameters(x):
-	"parses generation parameters string, the one you see in text field under the picture in UI:\n```\ngirl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate\nNegative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing\nSteps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b\n```\n\n    returns a dict with field values\n    ";a='VAE Decoder';Z='Full';Y='VAE Encoder';X='Schedule rho';W='Schedule min sigma';V='Schedule max sigma';U='Schedule type';T='RNG';S='Hires negative prompt';R='Hires prompt';Q='Hires checkpoint';P='Hires sampler';O='Clip skip';N='Styles array';B='';A={};E=B;F=B;K=_B;*L,G=x.strip().split(_C)
-	if len(re_param.findall(G))<3:L.append(G);G=B
-	for C in L:
+	"parses generation parameters string, the one you see in text field under the picture in UI:\n```\ngirl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate\nNegative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing\nSteps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b\n```\n\n    returns a dict with field values\n    ";K='VAE Decoder';L='Full';M='VAE Encoder';N='Schedule rho';O='Schedule min sigma';P='Schedule max sigma';Q='Schedule type';R='RNG';S='Hires negative prompt';T='Hires prompt';U='Hires checkpoint';V='Hires sampler';W='Clip skip';X='Styles array';B='';A={};E=B;F=B;Y=_B;*Z,G=x.strip().split(_C)
+	if len(re_param.findall(G))<3:Z.append(G);G=B
+	for C in Z:
 		C=C.strip()
-		if C.startswith('Negative prompt:'):K=True;C=C[16:].strip()
-		if K:F+=(B if F==B else _C)+C
+		if C.startswith('Negative prompt:'):Y=True;C=C[16:].strip()
+		if Y:F+=(B if F==B else _C)+C
 		else:E+=(B if E==B else _C)+C
 	if shared.opts.infotext_styles!='Ignore':
 		I,E,F=shared.prompt_styles.extract_styles_from_prompt(E,F)
-		if shared.opts.infotext_styles=='Apply':A[N]=I
-		elif shared.opts.infotext_styles=='Apply if any'and I:A[N]=I
+		if shared.opts.infotext_styles=='Apply':A[X]=I
+		elif shared.opts.infotext_styles=='Apply if any'and I:A[X]=I
 	A[_H]=E;A[_L]=F
 	for(H,D)in re_param.findall(G):
 		try:
@@ -101,22 +101,22 @@ def parse_generation_parameters(x):
 			if J is not _A:A[f"{H}-1"]=J.group(1);A[f"{H}-2"]=J.group(2)
 			else:A[H]=D
 		except Exception:print(f'Error parsing "{H}: {D}"')
-	if O not in A:A[O]='1'
-	M=A.get('Hypernet',_A)
-	if M is not _A:A[_H]+=f"<hypernet:{M}:{A.get('Hypernet strength','1.0')}>"
+	if W not in A:A[W]='1'
+	a=A.get('Hypernet',_A)
+	if a is not _A:A[_H]+=f"<hypernet:{a}:{A.get('Hypernet strength','1.0')}>"
 	if _F not in A:A[_F]=0;A[_I]=0
-	if P not in A:A[P]='Use same sampler'
-	if Q not in A:A[Q]='Use same checkpoint'
-	if R not in A:A[R]=B
+	if V not in A:A[V]='Use same sampler'
+	if U not in A:A[U]='Use same checkpoint'
+	if T not in A:A[T]=B
 	if S not in A:A[S]=B
 	restore_old_hires_fix_params(A)
-	if T not in A:A[T]='GPU'
-	if U not in A:A[U]='Automatic'
-	if V not in A:A[V]=0
-	if W not in A:A[W]=0
-	if X not in A:A[X]=0
-	if Y not in A:A[Y]=Z
-	if a not in A:A[a]=Z
+	if R not in A:A[R]='GPU'
+	if Q not in A:A[Q]='Automatic'
+	if P not in A:A[P]=0
+	if O not in A:A[O]=0
+	if N not in A:A[N]=0
+	if M not in A:A[M]=L
+	if K not in A:A[K]=L
 	return A
 infotext_to_setting_name_mapping=[]
 "Mapping of infotext labels to setting names. Only left for backwards compatibility - use OptionInfo(..., infotext='...') instead.\nExample content:\n\ninfotext_to_setting_name_mapping = [\n    ('Conditional mask weight', 'inpainting_mask_weight'),\n    ('Model hash', 'sd_model_checkpoint'),\n    ('ENSD', 'eta_noise_seed_delta'),\n    ('Schedule type', 'k_sched_type'),\n]\n"
@@ -130,7 +130,7 @@ def create_override_settings_dict(text_pairs):
 		A[C]=shared.opts.cast_value(C,D)
 	return A
 def connect_paste(button,paste_fields,input_comp,override_settings_component,tabname):
-	C=override_settings_component;A=button;B=paste_fields
+	A=override_settings_component;C=button;B=paste_fields
 	def D(prompt):
 		D=prompt
 		if not D and not shared.cmd_opts.hide_ui_dir_config:
@@ -151,7 +151,7 @@ def connect_paste(button,paste_fields,input_comp,override_settings_component,tab
 					C.append(gr.update(value=I))
 				except Exception:C.append(gr.update())
 		return C
-	if C is not _A:
+	if A is not _A:
 		F={A:1 for(B,A)in B}
 		def E(params):
 			E={};G=[(A.infotext,B)for(B,A)in shared.opts.data_labels.items()if A.infotext]
@@ -164,5 +164,5 @@ def connect_paste(button,paste_fields,input_comp,override_settings_component,tab
 				if A==H:continue
 				E[B]=A
 			D=[f"{A}: {B}"for(A,B)in E.items()];return gr.Dropdown.update(value=D,choices=D,visible=bool(D))
-		B=B+[(C,E)]
-	A.click(fn=D,inputs=[input_comp],outputs=[A[0]for A in B],show_progress=_B);A.click(fn=_A,_js=f"recalculate_prompts_{tabname}",inputs=[],outputs=[],show_progress=_B)
+		B=B+[(A,E)]
+	C.click(fn=D,inputs=[input_comp],outputs=[A[0]for A in B],show_progress=_B);C.click(fn=_A,_js=f"recalculate_prompts_{tabname}",inputs=[],outputs=[],show_progress=_B)

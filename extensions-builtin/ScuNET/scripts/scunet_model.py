@@ -41,5 +41,5 @@ class UpscalerScuNET(modules.upscaler.Upscaler):
 		A=SCUNet(in_nc=3,config=[4,4,4,4,4,4,4],dim=64);A.load_state_dict(torch.load(C),strict=True);A.eval()
 		for(F,E)in A.named_parameters():E.requires_grad=False
 		A=A.to(D);return A
-def on_ui_settings():G='Upscaling';F='upscaling';E='step';D='maximum';C='minimum';import gradio as B;from modules import shared as A;A.opts.add_option('SCUNET_tile',A.OptionInfo(256,'Tile size for SCUNET upscalers.',B.Slider,{C:0,D:512,E:16},section=(F,G)).info('0 = no tiling'));A.opts.add_option('SCUNET_tile_overlap',A.OptionInfo(8,'Tile overlap for SCUNET upscalers.',B.Slider,{C:0,D:64,E:1},section=(F,G)).info('Low values = visible seam'))
+def on_ui_settings():B='Upscaling';C='upscaling';D='step';E='maximum';F='minimum';import gradio as G;from modules import shared as A;A.opts.add_option('SCUNET_tile',A.OptionInfo(256,'Tile size for SCUNET upscalers.',G.Slider,{F:0,E:512,D:16},section=(C,B)).info('0 = no tiling'));A.opts.add_option('SCUNET_tile_overlap',A.OptionInfo(8,'Tile overlap for SCUNET upscalers.',G.Slider,{F:0,E:64,D:1},section=(C,B)).info('Low values = visible seam'))
 script_callbacks.on_ui_settings(on_ui_settings)

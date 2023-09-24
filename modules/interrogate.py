@@ -41,7 +41,7 @@ class InterrogateModels:
 		class A:
 			def checkpoint_wrapper(A):0
 		sys.modules['fairscale.nn.checkpoint.checkpoint_activations']=A
-	def load_blip_model(C):B='BLIP';C.create_fake_fairscale();import models.blip;D=modelloader.load_models(model_path=os.path.join(paths.models_path,B),model_url='https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth',ext_filter=['.pth'],download_name='model_base_caption_capfilt_large.pth');A=models.blip.blip_decoder(pretrained=D[0],image_size=blip_image_eval_size,vit='base',med_config=os.path.join(paths.paths[B],'configs','med_config.json'));A.eval();return A
+	def load_blip_model(C):A='BLIP';C.create_fake_fairscale();import models.blip;D=modelloader.load_models(model_path=os.path.join(paths.models_path,A),model_url='https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_caption_capfilt_large.pth',ext_filter=['.pth'],download_name='model_base_caption_capfilt_large.pth');B=models.blip.blip_decoder(pretrained=D[0],image_size=blip_image_eval_size,vit='base',med_config=os.path.join(paths.paths[A],'configs','med_config.json'));B.eval();return B
 	def load_clip_model(D):
 		import clip as B
 		if D.running_on_cpu:A,C=B.load(clip_model_name,device='cpu',download_root=shared.cmd_opts.clip_models_path)

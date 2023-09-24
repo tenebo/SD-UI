@@ -53,23 +53,23 @@ def restore_webui_config(config):
 	try:B.git.fetch(all=_A);B.git.reset(A,hard=_A);print(f"* Restored webui to commit {A}.")
 	except Exception:errors.report(f"Error restoring webui to commit{A}")
 def restore_extension_config(config):
-	G=config;E=False;print('* Restoring extension state...')
+	G=config;C=False;print('* Restoring extension state...')
 	if _F not in G:print('Error: No extension data saved to config');return
-	H=G[_F];C=[];F=[]
+	H=G[_F];D=[];F=[]
 	for A in tqdm.tqdm(extensions.extensions):
 		if A.is_builtin:continue
-		A.read_info_from_repo();D=A.commit_hash
-		if A.name not in H:A.disabled=_A;F.append(A.name);C.append((A,D[:8],E,'Saved extension state not found in config, marking as disabled'));continue
+		A.read_info_from_repo();E=A.commit_hash
+		if A.name not in H:A.disabled=_A;F.append(A.name);D.append((A,E[:8],C,'Saved extension state not found in config, marking as disabled'));continue
 		B=H[A.name]
 		if _C in B and B[_C]:
 			try:
 				A.fetch_and_reset_hard(B[_C]);A.read_info_from_repo()
-				if D!=B[_C]:C.append((A,D[:8],_A,B[_C][:8]))
-			except Exception as J:C.append((A,D[:8],E,J))
-		else:C.append((A,D[:8],E,'No commit hash found in config'))
-		if not B.get(_J,E):A.disabled=_A;F.append(A.name)
-		else:A.disabled=E
+				if E!=B[_C]:D.append((A,E[:8],_A,B[_C][:8]))
+			except Exception as J:D.append((A,E[:8],C,J))
+		else:D.append((A,E[:8],C,'No commit hash found in config'))
+		if not B.get(_J,C):A.disabled=_A;F.append(A.name)
+		else:A.disabled=C
 	shared.opts.disabled_extensions=F;shared.opts.save(shared.config_filename);print('* Finished restoring extensions. Results:')
-	for(A,K,L,I)in C:
+	for(A,K,L,I)in D:
 		if L:print(f"  + {A.name}: {K} -> {I}")
 		else:print(f"  ! {A.name}: FAILURE ({I})")

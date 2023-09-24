@@ -2,12 +2,12 @@ import json,os
 from modules import errors,scripts
 localizations={}
 def list_localizations(dirname):
-	E='.json';C=dirname;localizations.clear()
-	for A in os.listdir(C):
-		B,D=os.path.splitext(A)
-		if D.lower()!=E:continue
-		localizations[B]=os.path.join(C,A)
-	for A in scripts.list_scripts('localizations',E):B,D=os.path.splitext(A.filename);localizations[B]=A.path
+	C='.json';D=dirname;localizations.clear()
+	for A in os.listdir(D):
+		B,E=os.path.splitext(A)
+		if E.lower()!=C:continue
+		localizations[B]=os.path.join(D,A)
+	for A in scripts.list_scripts('localizations',C):B,E=os.path.splitext(A.filename);localizations[B]=A.path
 def localization_js(current_localization_name):
 	A=localizations.get(current_localization_name,None);B={}
 	if A is not None:

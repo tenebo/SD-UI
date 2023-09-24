@@ -32,12 +32,12 @@ def restore_base_vae(model):
 	delete_base_vae()
 def get_filename(filepath):return os.path.basename(filepath)
 def refresh_vae_list():
-	I='**/*.safetensors';H='**/*.pt';G='**/*.ckpt';F='**/*.vae.safetensors';E='**/*.vae.pt';D='**/*.vae.ckpt';vae_dict.clear();A=[os.path.join(sd_models.model_path,D),os.path.join(sd_models.model_path,E),os.path.join(sd_models.model_path,F),os.path.join(vae_path,G),os.path.join(vae_path,H),os.path.join(vae_path,I)]
-	if shared.cmd_opts.ckpt_dir is not _A and os.path.isdir(shared.cmd_opts.ckpt_dir):A+=[os.path.join(shared.cmd_opts.ckpt_dir,D),os.path.join(shared.cmd_opts.ckpt_dir,E),os.path.join(shared.cmd_opts.ckpt_dir,F)]
-	if shared.cmd_opts.vae_dir is not _A and os.path.isdir(shared.cmd_opts.vae_dir):A+=[os.path.join(shared.cmd_opts.vae_dir,G),os.path.join(shared.cmd_opts.vae_dir,H),os.path.join(shared.cmd_opts.vae_dir,I)]
-	B=[]
-	for J in A:B+=glob.iglob(J,recursive=True)
-	for C in B:K=get_filename(C);vae_dict[K]=C
+	B='**/*.safetensors';C='**/*.pt';D='**/*.ckpt';E='**/*.vae.safetensors';F='**/*.vae.pt';G='**/*.vae.ckpt';vae_dict.clear();A=[os.path.join(sd_models.model_path,G),os.path.join(sd_models.model_path,F),os.path.join(sd_models.model_path,E),os.path.join(vae_path,D),os.path.join(vae_path,C),os.path.join(vae_path,B)]
+	if shared.cmd_opts.ckpt_dir is not _A and os.path.isdir(shared.cmd_opts.ckpt_dir):A+=[os.path.join(shared.cmd_opts.ckpt_dir,G),os.path.join(shared.cmd_opts.ckpt_dir,F),os.path.join(shared.cmd_opts.ckpt_dir,E)]
+	if shared.cmd_opts.vae_dir is not _A and os.path.isdir(shared.cmd_opts.vae_dir):A+=[os.path.join(shared.cmd_opts.vae_dir,D),os.path.join(shared.cmd_opts.vae_dir,C),os.path.join(shared.cmd_opts.vae_dir,B)]
+	H=[]
+	for J in A:H+=glob.iglob(J,recursive=True)
+	for I in H:K=get_filename(I);vae_dict[K]=I
 	vae_dict.update(dict(sorted(vae_dict.items(),key=lambda item:shared.natural_sort_key(item[0]))))
 def find_vae_near_checkpoint(checkpoint_file):
 	B=os.path.basename(checkpoint_file).rsplit('.',1)[0]

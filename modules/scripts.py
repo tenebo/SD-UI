@@ -56,12 +56,12 @@ scripts_data=[]
 postprocessing_scripts_data=[]
 ScriptClassData=namedtuple('ScriptClassData',['script_class','path',_G,'module'])
 def list_scripts(scriptdirname,extension,*,include_extensions=_B):
-	D=extension;C=scriptdirname;A=[];B=os.path.join(paths.script_path,C)
+	C=extension;D=scriptdirname;A=[];B=os.path.join(paths.script_path,D)
 	if os.path.exists(B):
 		for E in sorted(os.listdir(B)):A.append(ScriptFile(paths.script_path,E,os.path.join(B,E)))
 	if include_extensions:
-		for F in extensions.active():A+=F.list_files(C,D)
-	A=[A for A in A if os.path.splitext(A.path)[1].lower()==D and os.path.isfile(A.path)];return A
+		for F in extensions.active():A+=F.list_files(D,C)
+	A=[A for A in A if os.path.splitext(A.path)[1].lower()==C and os.path.isfile(A.path)];return A
 def list_files_with_name(filename):
 	A=[];D=[paths.script_path]+[A.path for A in extensions.active()]
 	for B in D:
@@ -191,13 +191,13 @@ class ScriptRunner:
 		for A in B.alwayson_scripts:
 			try:C=p.script_args[A.args_from:A.args_to];A.postprocess_image(p,pp,*C)
 			except Exception:errors.report(f"Error running postprocess_image: {A.filename}",exc_info=_B)
-	def before_component(B,component,**D):
-		C=component
-		for(E,A)in B.on_before_component_elem_id.get(D.get('elem_id'),[]):
-			try:E(OnComponent(component=C))
+	def before_component(B,component,**C):
+		D=component
+		for(E,A)in B.on_before_component_elem_id.get(C.get('elem_id'),[]):
+			try:E(OnComponent(component=D))
 			except Exception:errors.report(f"Error running on_before_component: {A.filename}",exc_info=_B)
 		for A in B.scripts:
-			try:A.before_component(C,**D)
+			try:A.before_component(D,**C)
 			except Exception:errors.report(f"Error running before_component: {A.filename}",exc_info=_B)
 	def after_component(C,component,**D):
 		B=component

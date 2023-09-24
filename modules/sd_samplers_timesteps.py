@@ -37,11 +37,11 @@ class CompVisSampler(sd_samplers_common.Sampler):
 		if opts.always_discard_next_to_last_sigma and not A:A=_B;p.extra_generation_params['Discard penultimate sigma']=_B
 		C+=1 if A else 0;D=torch.clip(torch.asarray(list(range(0,1000,1000//C)),device=devices.device)+1,0,999);return D
 	def sample_img2img(A,p,x,noise,conditioning,unconditional_conditioning,steps=_A,image_conditioning=_A):
-		L='is_img2img';D=steps;B=noise;D,C=sd_samplers_common.setup_img2img_steps(p,D);E=A.get_timesteps(p,D);M=E[:C];H=shared.sd_model.alphas_cumprod;I=torch.sqrt(H[E[C]]);N=torch.sqrt(1-H[E[C]]);F=x*I+B*N
-		if opts.img2img_extra_noise>0:p.extra_generation_params['Extra noise']=opts.img2img_extra_noise;J=ExtraNoiseParams(B,x,F);extra_noise_callback(J);B=J.noise;F+=B*opts.img2img_extra_noise*I
-		G=A.initialize(p);K=inspect.signature(A.func).parameters
-		if _C in K:G[_C]=M
-		if L in K:G[L]=_B
+		H='is_img2img';D=steps;B=noise;D,C=sd_samplers_common.setup_img2img_steps(p,D);E=A.get_timesteps(p,D);M=E[:C];I=shared.sd_model.alphas_cumprod;J=torch.sqrt(I[E[C]]);N=torch.sqrt(1-I[E[C]]);F=x*J+B*N
+		if opts.img2img_extra_noise>0:p.extra_generation_params['Extra noise']=opts.img2img_extra_noise;K=ExtraNoiseParams(B,x,F);extra_noise_callback(K);B=K.noise;F+=B*opts.img2img_extra_noise*J
+		G=A.initialize(p);L=inspect.signature(A.func).parameters
+		if _C in L:G[_C]=M
+		if H in L:G[H]=_B
 		A.model_wrap_cfg.init_latent=x;A.last_latent=x;A.sampler_extra_args={'cond':conditioning,_E:image_conditioning,_F:unconditional_conditioning,_G:p.cfg_scale,_H:A.s_min_uncond};O=A.launch_sampling(C+1,lambda:A.func(A.model_wrap_cfg,F,extra_args=A.sampler_extra_args,disable=_D,callback=A.callback_state,**G))
 		if A.model_wrap_cfg.padded_cond_uncond:p.extra_generation_params[_I]=_B
 		return O

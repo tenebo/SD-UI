@@ -38,9 +38,9 @@ class DropdownEditable(FormComponent,gr.Dropdown):
 class InputAccordion(gr.Checkbox):
 	'A gr.Accordion that can be used as an input - returns True if open, False if closed.\n\n    Actaully just a hidden checkbox, but creates an accordion that follows and is followed by the state of the checkbox.\n    ';global_index=0
 	def __init__(A,value,**B):
-		E='label';D=value;C='elem_id';A.accordion_id=B.get(C)
+		D='label';E=value;C='elem_id';A.accordion_id=B.get(C)
 		if A.accordion_id is None:A.accordion_id=f"input-accordion-{InputAccordion.global_index}";InputAccordion.global_index+=1
-		F={**B,C:f"{A.accordion_id}-checkbox",'visible':False};super().__init__(D,**F);A.change(fn=None,_js='function(checked){ inputAccordionChecked("'+A.accordion_id+'", checked); }',inputs=[A]);G={**B,C:A.accordion_id,E:B.get(E,'Accordion'),_A:['input-accordion'],'open':D};A.accordion=gr.Accordion(**G)
+		F={**B,C:f"{A.accordion_id}-checkbox",'visible':False};super().__init__(E,**F);A.change(fn=None,_js='function(checked){ inputAccordionChecked("'+A.accordion_id+'", checked); }',inputs=[A]);G={**B,C:A.accordion_id,D:B.get(D,'Accordion'),_A:['input-accordion'],'open':E};A.accordion=gr.Accordion(**G)
 	def extra(A):'Allows you to put something into the label of the accordion.\n\n        Use it like this:\n\n        ```\n        with InputAccordion(False, label="Accordion") as acc:\n            with acc.extra():\n                FormHTML(value="hello", min_width=0)\n\n            ...\n        ```\n        ';return gr.Column(elem_id=A.accordion_id+'-extra',elem_classes='input-accordion-extra',min_width=0)
 	def __enter__(A):A.accordion.__enter__();return A
 	def __exit__(A,exc_type,exc_val,exc_tb):A.accordion.__exit__(exc_type,exc_val,exc_tb)

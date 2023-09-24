@@ -14,19 +14,19 @@ class UiLoadsave:
 	def add_component(E,path,x):
 		'adds component to the registry of tracked components';B='value';assert not E.finalized_ui
 		def A(obj,field,condition=_A,init_field=_A):
-			H=init_field;G=condition;F=obj;C=field;D=f"{path}/{C}"
+			G=init_field;H=condition;F=obj;C=field;D=f"{path}/{C}"
 			if getattr(F,'custom_script_source',_A)is not _A:D=f"customscript/{F.custom_script_source}/{D}"
 			if getattr(F,'do_not_save_to_config',_B):return
 			A=E.ui_settings.get(D,_A)
 			if A is _A:E.ui_settings[D]=getattr(F,C)
-			elif G and not G(A):0
+			elif H and not H(A):0
 			else:
 				if isinstance(x,gr.Textbox)and C==B:A=str(A)
 				elif isinstance(x,gr.Number)and C==B:
 					try:A=float(A)
 					except ValueError:return
 				setattr(F,C,A)
-				if H is not _A:H(A)
+				if G is not _A:G(A)
 			if C==B and D not in E.component_mapping:E.component_mapping[D]=x
 		if type(x)in[gr.Slider,gr.Radio,gr.Checkbox,gr.Textbox,gr.Number,gr.Dropdown,ToolButton,gr.Button]and x.visible:A(x,'visible')
 		if type(x)==gr.Slider:A(x,B);A(x,'minimum');A(x,'maximum');A(x,'step')

@@ -27,7 +27,7 @@ available_extensions={_E:[]}
 STYLE_PRIMARY=' style="color: var(--primary-400)"'
 def check_access():assert not shared.cmd_opts.disable_extension_access,'extension access disabled because of command line flags'
 def apply_and_restart(disable_list,update_list,disable_all):
-	D=update_list;C=disable_list;check_access();E=json.loads(C);assert type(E)==list,f"wrong disable_list data for apply_and_restart: {C}";A=json.loads(D);assert type(A)==list,f"wrong update_list data for apply_and_restart: {D}"
+	C=update_list;D=disable_list;check_access();E=json.loads(D);assert type(E)==list,f"wrong disable_list data for apply_and_restart: {D}";A=json.loads(C);assert type(A)==list,f"wrong update_list data for apply_and_restart: {C}"
 	if A:save_config_state('Backup (pre-update)')
 	A=set(A)
 	for B in extensions.extensions:
@@ -106,22 +106,22 @@ def extension_table():
     '''
 	B+=_P;return B
 def update_config_states_table(state_name):
-	f='commit_date';X=state_name;W='commit_hash';V='branch';U='remote';C='<unknown>'
-	if X==_D:A=config_states.get_config()
-	else:A=config_states.all_config_states[X]
-	Y=A.get(_G,_N);Z=time.asctime(time.gmtime(A[_K]));M=A.get(_O,C)
+	X='commit_date';Y=state_name;M='commit_hash';N='branch';O='remote';C='<unknown>'
+	if Y==_D:A=config_states.get_config()
+	else:A=config_states.all_config_states[Y]
+	Z=A.get(_G,_N);a=time.asctime(time.gmtime(A[_K]));P=A.get(_O,C)
 	try:
-		D=A[_F][U]or'';a=A[_F][V];N=A[_F][W]or C;E=A[_F][f]
+		D=A[_F][O]or'';b=A[_F][N];Q=A[_F][M]or C;E=A[_F][X]
 		if E:E=time.asctime(time.gmtime(E))
 		else:E=C
-		O=f'<a href="{html.escape(D)}" target="_blank">{html.escape(D or"")}</a>';P=make_commit_link(N,D);Q=make_commit_link(N,D,E);R=config_states.get_webui_config();F='';G='';B=''
-		if R[U]!=D:F=STYLE_PRIMARY
-		if R[V]!=a:G=STYLE_PRIMARY
-		if R[W]!=N:B=STYLE_PRIMARY
+		R=f'<a href="{html.escape(D)}" target="_blank">{html.escape(D or"")}</a>';S=make_commit_link(Q,D);T=make_commit_link(Q,D,E);U=config_states.get_webui_config();F='';G='';B=''
+		if U[O]!=D:F=STYLE_PRIMARY
+		if U[N]!=b:G=STYLE_PRIMARY
+		if U[M]!=Q:B=STYLE_PRIMARY
 		L=f'''<!-- {time.time()} -->
-<h2>Config Backup: {Y}</h2>
-<div><b>Filepath:</b> {M}</div>
-<div><b>Created at:</b> {Z}</div>
+<h2>Config Backup: {Z}</h2>
+<div><b>Filepath:</b> {P}</div>
+<div><b>Created at:</b> {a}</div>
 <h2>WebUI State</h2>
 <table id="config_state_webui">
     <thead>
@@ -135,16 +135,16 @@ def update_config_states_table(state_name):
     <tbody>
         <tr>
             <td>
-                <label{F}>{O}</label>
+                <label{F}>{R}</label>
             </td>
             <td>
-                <label{G}>{a}</label>
+                <label{G}>{b}</label>
             </td>
             <td>
-                <label{B}>{P}</label>
+                <label{B}>{S}</label>
             </td>
             <td>
-                <label{B}>{Q}</label>
+                <label{B}>{T}</label>
             </td>
         </tr>
     </tbody>
@@ -161,35 +161,35 @@ def update_config_states_table(state_name):
         </tr>
     </thead>
     <tbody>
-''';b={A.name:A for A in extensions.extensions}
-		for(S,H)in A[_E].items():
-			I=H[U]or'';c=H[V]or C;d=H['enabled'];T=H[W]or C;J=H[f]
+''';c={A.name:A for A in extensions.extensions}
+		for(V,H)in A[_E].items():
+			I=H[O]or'';d=H[N]or C;e=H['enabled'];W=H[M]or C;J=H[X]
 			if J:J=time.asctime(time.gmtime(J))
 			else:J=C
-			O=f'<a href="{html.escape(I)}" target="_blank">{html.escape(I or"")}</a>';P=make_commit_link(T,I);Q=make_commit_link(T,I,J);e='';F='';G='';B=''
-			if S in b:
-				K=b[S];K.read_info_from_repo()
-				if K.enabled!=d:e=STYLE_PRIMARY
+			R=f'<a href="{html.escape(I)}" target="_blank">{html.escape(I or"")}</a>';S=make_commit_link(W,I);T=make_commit_link(W,I,J);f='';F='';G='';B=''
+			if V in c:
+				K=c[V];K.read_info_from_repo()
+				if K.enabled!=e:f=STYLE_PRIMARY
 				if K.remote!=I:F=STYLE_PRIMARY
-				if K.branch!=c:G=STYLE_PRIMARY
-				if K.commit_hash!=T:B=STYLE_PRIMARY
+				if K.branch!=d:G=STYLE_PRIMARY
+				if K.commit_hash!=W:B=STYLE_PRIMARY
 			L+=f'''        <tr>
-            <td><label{e}><input class="gr-check-radio gr-checkbox" type="checkbox" disabled="true" {_J if d else""}>{html.escape(S)}</label></td>
-            <td><label{F}>{O}</label></td>
-            <td><label{G}>{c}</label></td>
-            <td><label{B}>{P}</label></td>
-            <td><label{B}>{Q}</label></td>
+            <td><label{f}><input class="gr-check-radio gr-checkbox" type="checkbox" disabled="true" {_J if e else""}>{html.escape(V)}</label></td>
+            <td><label{F}>{R}</label></td>
+            <td><label{G}>{d}</label></td>
+            <td><label{B}>{S}</label></td>
+            <td><label{B}>{T}</label></td>
         </tr>
 '''
 		L+='    </tbody>\n</table>'
-	except Exception as g:print(f"[ERROR]: Config states {M}, {g}");L=f"<!-- {time.time()} -->\n<h2>Config Backup: {Y}</h2>\n<div><b>Filepath:</b> {M}</div>\n<div><b>Created at:</b> {Z}</div>\n<h2>This file is corrupted</h2>"
+	except Exception as g:print(f"[ERROR]: Config states {P}, {g}");L=f"<!-- {time.time()} -->\n<h2>Config Backup: {Z}</h2>\n<div><b>Filepath:</b> {P}</div>\n<div><b>Created at:</b> {a}</div>\n<h2>This file is corrupted</h2>"
 	return L
 def normalize_git_url(url):
 	A=url
 	if A is _B:return''
 	A=A.replace('.git','');return A
 def install_extension_from_url(dirname,url,branch_name=_B):
-	J='blob:none';H=branch_name;B=dirname;A=url;check_access()
+	H='blob:none';I=branch_name;B=dirname;A=url;check_access()
 	if isinstance(B,str):B=B.strip()
 	if isinstance(A,str):A=A.strip()
 	assert A,'No URL specified'
@@ -199,18 +199,18 @@ def install_extension_from_url(dirname,url,branch_name=_B):
 	D=os.path.join(paths.data_path,'tmp',B)
 	try:
 		shutil.rmtree(D,_C)
-		if not H:
-			with git.Repo.clone_from(A,D,filter=[J])as E:
+		if not I:
+			with git.Repo.clone_from(A,D,filter=[H])as E:
 				E.remote().fetch()
 				for G in E.submodules:G.update()
 		else:
-			with git.Repo.clone_from(A,D,filter=[J],branch=H)as E:
+			with git.Repo.clone_from(A,D,filter=[H],branch=I)as E:
 				E.remote().fetch()
 				for G in E.submodules:G.update()
 		try:os.rename(D,C)
-		except OSError as I:
-			if I.errno==errno.EXDEV:shutil.move(D,C)
-			else:raise I
+		except OSError as J:
+			if J.errno==errno.EXDEV:shutil.move(D,C)
+			else:raise J
 		import launch as L;L.run_extension_installer(C);extensions.list_extensions();return[extension_table(),html.escape(f"Installed into {C}. Use Installed tab to restart.")]
 	finally:shutil.rmtree(D,_C)
 def install_extension_from_index(url,hide_tags,sort_column,filter_text):A,B=install_extension_from_url(_B,url);C,D=refresh_available_extensions_from_data(hide_tags,sort_column,filter_text);return C,A,B,''
@@ -225,7 +225,7 @@ def get_date(info,key):
 	try:return datetime.strptime(info.get(key),'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc).astimezone().strftime('%Y-%m-%d')
 	except(ValueError,TypeError):return''
 def refresh_available_extensions_from_data(hide_tags,sort_column,filter_text=''):
-	M='tags';I=sort_column;C=filter_text;N=available_extensions[_E];O={normalize_git_url(A.remote):A.name for A in extensions.extensions};D=available_extensions.get(M,{});P=set(hide_tags);E=0;F=f'''<!-- {time.time()} -->
+	I='tags';J=sort_column;C=filter_text;N=available_extensions[_E];O={normalize_git_url(A.remote):A.name for A in extensions.extensions};D=available_extensions.get(I,{});P=set(hide_tags);E=0;F=f'''<!-- {time.time()} -->
     <table id="available_extensions">
         <thead>
             <tr>
@@ -235,52 +235,52 @@ def refresh_available_extensions_from_data(hide_tags,sort_column,filter_text='')
             </tr>
         </thead>
         <tbody>
-    ''';Q,R=sort_ordering[I if 0<=I<len(sort_ordering)else 0]
+    ''';Q,R=sort_ordering[J if 0<=J<len(sort_ordering)else 0]
 	for A in sorted(N,key=R,reverse=Q):
-		J=A.get(_G,'noname');S=int(A.get(_M,0));T=A.get(_L,'unknown');U=get_date(A,_Q);V=get_date(A,_K);G=A.get('url',_B);K=A.get('description','');B=A.get(M,[])
+		K=A.get(_G,'noname');S=int(A.get(_M,0));T=A.get(_L,'unknown');U=get_date(A,_Q);V=get_date(A,_K);G=A.get('url',_B);L=A.get('description','');B=A.get(I,[])
 		if G is _B:continue
 		H=O.get(normalize_git_url(G),_B);B=B+[_H]if H else B
 		if any(A for A in B if A in P):E+=1;continue
 		if C and C.strip():
-			if C.lower()not in html.escape(J).lower()and C.lower()not in html.escape(K).lower():E+=1;continue
+			if C.lower()not in html.escape(K).lower()and C.lower()not in html.escape(L).lower():E+=1;continue
 		W=f'<button onclick="install_extension_from_index(this, \'{html.escape(G)}\')" {"disabled=disabled"if H else""} class="lg secondary gradio-button custom-button">{_R if not H else _S}</button>';X=', '.join([f"<span class='extension-tag' title='{D.get(A,'')}'>{A}</span>"for A in B]);F+=f'''
             <tr>
-                <td><a href="{html.escape(G)}" target="_blank">{html.escape(J)}</a><br />{X}</td>
-                <td>{html.escape(K)}<p class="info">
+                <td><a href="{html.escape(G)}" target="_blank">{html.escape(K)}</a><br />{X}</td>
+                <td>{html.escape(L)}<p class="info">
                 <span class="date_added">Update: {html.escape(U)}  Added: {html.escape(T)}  Created: {html.escape(V)}</span><span class="star_count">stars: <b>{S}</b></a></p></td>
                 <td>{W}</td>
             </tr>
 
         '''
-		for L in[A for A in B if A not in D]:D[L]=L
+		for M in[A for A in B if A not in D]:D[M]=M
 	F+=_P
 	if E>0:F+=f"<p>Extension hidden: {E}</p>"
 	return F,list(D)
 def preload_extensions_git_metadata():
 	for A in extensions.extensions:A.read_info_from_repo()
 def create_ui():
-	V='newest first';U='localization';T='ads';S='Loading...';K='none';H='primary';import modules.ui;config_states.list_config_states();threading.Thread(target=preload_extensions_git_metadata).start()
-	with gr.Blocks(analytics_enabled=_A)as I:
+	L='newest first';M='localization';N='ads';O='Loading...';I='none';G='primary';import modules.ui;config_states.list_config_states();threading.Thread(target=preload_extensions_git_metadata).start()
+	with gr.Blocks(analytics_enabled=_A)as J:
 		with gr.Tabs(elem_id='tabs_extensions'):
 			with gr.TabItem(_S,id=_H):
-				with gr.Row(elem_id='extensions_installed_top'):W='Apply and restart UI'if restart.is_restartable()else'Apply and quit';X=gr.Button(value=W,variant=H);Y=gr.Button(value='Check for updates');Z=gr.Radio(label='Disable all extensions',choices=[K,'extra','all'],value=shared.opts.disable_all_extensions,elem_id='extensions_disable_all');L=gr.Text(elem_id='extensions_disabled_list',visible=_A,container=_A);a=gr.Text(elem_id='extensions_update_list',visible=_A,container=_A)
-				M=''
-				if shared.cmd_opts.disable_all_extensions or shared.cmd_opts.disable_extra_extensions or shared.opts.disable_all_extensions!=K:
-					if shared.cmd_opts.disable_all_extensions:J='"--disable-all-extensions" was used, remove it to load all extensions again'
-					elif shared.opts.disable_all_extensions!=K:J='"Disable all extensions" was set, change it to "none" to load all extensions again'
-					elif shared.cmd_opts.disable_extra_extensions:J='"--disable-extra-extensions" was used, remove it to load all extensions again'
-					M=f'<span style="color: var(--primary-400);">{J}</span>'
-				with gr.Row():N=gr.HTML(M)
-				with gr.Row(elem_classes='progress-container'):G=gr.HTML(S,elem_id='extensions_installed_html')
-				I.load(fn=extension_table,inputs=[],outputs=[G]);X.click(fn=apply_and_restart,_js='extensions_apply',inputs=[L,a,Z],outputs=[]);Y.click(fn=wrap_gradio_gpu_call(check_updates,extra_outputs=[gr.update()]),_js='extensions_check',inputs=[N,L],outputs=[G,N])
+				with gr.Row(elem_id='extensions_installed_top'):W='Apply and restart UI'if restart.is_restartable()else'Apply and quit';X=gr.Button(value=W,variant=G);Y=gr.Button(value='Check for updates');Z=gr.Radio(label='Disable all extensions',choices=[I,'extra','all'],value=shared.opts.disable_all_extensions,elem_id='extensions_disable_all');P=gr.Text(elem_id='extensions_disabled_list',visible=_A,container=_A);a=gr.Text(elem_id='extensions_update_list',visible=_A,container=_A)
+				Q=''
+				if shared.cmd_opts.disable_all_extensions or shared.cmd_opts.disable_extra_extensions or shared.opts.disable_all_extensions!=I:
+					if shared.cmd_opts.disable_all_extensions:K='"--disable-all-extensions" was used, remove it to load all extensions again'
+					elif shared.opts.disable_all_extensions!=I:K='"Disable all extensions" was set, change it to "none" to load all extensions again'
+					elif shared.cmd_opts.disable_extra_extensions:K='"--disable-extra-extensions" was used, remove it to load all extensions again'
+					Q=f'<span style="color: var(--primary-400);">{K}</span>'
+				with gr.Row():R=gr.HTML(Q)
+				with gr.Row(elem_classes='progress-container'):H=gr.HTML(O,elem_id='extensions_installed_html')
+				J.load(fn=extension_table,inputs=[],outputs=[H]);X.click(fn=apply_and_restart,_js='extensions_apply',inputs=[P,a,Z],outputs=[]);Y.click(fn=wrap_gradio_gpu_call(check_updates,extra_outputs=[gr.update()]),_js='extensions_check',inputs=[R,P],outputs=[H,R])
 			with gr.TabItem('Available',id='available'):
-				with gr.Row():b=gr.Button(value='Load from:',variant=H);c=os.environ.get('WEBUI_EXTENSIONS_INDEX','https://raw.githubusercontent.com/tenebo/standard-demo-we-extensions/master/index.json');O=gr.Text(value=c,label='Extension index URL',container=_A);d=gr.Text(elem_id='extension_to_install',visible=_A);e=gr.Button(elem_id='install_extension_button',visible=_A)
-				with gr.Row():A=gr.CheckboxGroup(value=[T,U,_H],label='Hide extensions with tags',choices=['script',T,U,_H]);C=gr.Radio(value=V,label='Order',choices=[V,'oldest first','a-z','z-a','internal order','update time','create time',_M],type='index')
+				with gr.Row():b=gr.Button(value='Load from:',variant=G);c=os.environ.get('WEBUI_EXTENSIONS_INDEX','https://raw.githubusercontent.com/tenebo/standard-demo-we-extensions/master/index.json');S=gr.Text(value=c,label='Extension index URL',container=_A);d=gr.Text(elem_id='extension_to_install',visible=_A);e=gr.Button(elem_id='install_extension_button',visible=_A)
+				with gr.Row():A=gr.CheckboxGroup(value=[N,M,_H],label='Hide extensions with tags',choices=['script',N,M,_H]);C=gr.Radio(value=L,label='Order',choices=[L,'oldest first','a-z','z-a','internal order','update time','create time',_M],type='index')
 				with gr.Row():D=gr.Text(label='Search',container=_A)
-				B=gr.HTML();F=gr.HTML();b.click(fn=modules.ui.wrap_gradio_call(refresh_available_extensions,extra_outputs=[gr.update(),gr.update(),gr.update(),gr.update()]),inputs=[O,A,C],outputs=[O,F,A,D,B]);e.click(fn=modules.ui.wrap_gradio_call(install_extension_from_index,extra_outputs=[gr.update(),gr.update()]),inputs=[d,A,C,D],outputs=[F,G,B]);D.change(fn=modules.ui.wrap_gradio_call(search_extensions,extra_outputs=[gr.update()]),inputs=[D,A,C],outputs=[F,B]);A.change(fn=modules.ui.wrap_gradio_call(refresh_available_extensions_for_tags,extra_outputs=[gr.update()]),inputs=[A,C,D],outputs=[F,B]);C.change(fn=modules.ui.wrap_gradio_call(refresh_available_extensions_for_tags,extra_outputs=[gr.update()]),inputs=[A,C,D],outputs=[F,B])
-			with gr.TabItem('Install from URL',id='install_from_url'):P=gr.Text(label="URL for extension's git repository");f=gr.Text(label='Specific branch name',placeholder='Leave empty for default main branch');g=gr.Text(label='Local directory name',placeholder='Leave empty for auto');h=gr.Button(value=_R,variant=H);B=gr.HTML(elem_id='extension_install_result');h.click(fn=modules.ui.wrap_gradio_call(lambda*A:[gr.update(),*install_extension_from_url(*A)],extra_outputs=[gr.update(),gr.update()]),inputs=[g,P,f],outputs=[P,G,B])
+				B=gr.HTML();F=gr.HTML();b.click(fn=modules.ui.wrap_gradio_call(refresh_available_extensions,extra_outputs=[gr.update(),gr.update(),gr.update(),gr.update()]),inputs=[S,A,C],outputs=[S,F,A,D,B]);e.click(fn=modules.ui.wrap_gradio_call(install_extension_from_index,extra_outputs=[gr.update(),gr.update()]),inputs=[d,A,C,D],outputs=[F,H,B]);D.change(fn=modules.ui.wrap_gradio_call(search_extensions,extra_outputs=[gr.update()]),inputs=[D,A,C],outputs=[F,B]);A.change(fn=modules.ui.wrap_gradio_call(refresh_available_extensions_for_tags,extra_outputs=[gr.update()]),inputs=[A,C,D],outputs=[F,B]);C.change(fn=modules.ui.wrap_gradio_call(refresh_available_extensions_for_tags,extra_outputs=[gr.update()]),inputs=[A,C,D],outputs=[F,B])
+			with gr.TabItem('Install from URL',id='install_from_url'):T=gr.Text(label="URL for extension's git repository");f=gr.Text(label='Specific branch name',placeholder='Leave empty for default main branch');g=gr.Text(label='Local directory name',placeholder='Leave empty for auto');h=gr.Button(value=_R,variant=G);B=gr.HTML(elem_id='extension_install_result');h.click(fn=modules.ui.wrap_gradio_call(lambda*A:[gr.update(),*install_extension_from_url(*A)],extra_outputs=[gr.update(),gr.update()]),inputs=[g,T,f],outputs=[T,H,B])
 			with gr.TabItem('Backup/Restore'):
-				with gr.Row(elem_id='extensions_backup_top_row'):E=gr.Dropdown(label='Saved Configs',elem_id='extension_backup_saved_configs',value=_D,choices=[_D]+list(config_states.all_config_states.keys()));modules.ui.create_refresh_button(E,config_states.list_config_states,lambda:{'choices':[_D]+list(config_states.all_config_states.keys())},'refresh_config_states');i=gr.Radio(label='State to restore',choices=[_E,_F,_I],value=_E,elem_id='extension_backup_restore_type');j=gr.Button(value='Restore Selected Config',variant=H,elem_id='extension_backup_restore')
+				with gr.Row(elem_id='extensions_backup_top_row'):E=gr.Dropdown(label='Saved Configs',elem_id='extension_backup_saved_configs',value=_D,choices=[_D]+list(config_states.all_config_states.keys()));modules.ui.create_refresh_button(E,config_states.list_config_states,lambda:{'choices':[_D]+list(config_states.all_config_states.keys())},'refresh_config_states');i=gr.Radio(label='State to restore',choices=[_E,_F,_I],value=_E,elem_id='extension_backup_restore_type');j=gr.Button(value='Restore Selected Config',variant=G,elem_id='extension_backup_restore')
 				with gr.Row(elem_id='extensions_backup_top_row2'):k=gr.Textbox('',placeholder='Config Name',show_label=_A);l=gr.Button(value='Save Current Config')
-				Q=gr.HTML('');R=gr.HTML(S);I.load(fn=update_config_states_table,inputs=[E],outputs=[R]);l.click(fn=save_config_state,inputs=[k],outputs=[E,Q]);m=gr.Label(visible=_A);j.click(fn=restore_config_state,_js='config_state_confirm_restore',inputs=[m,E,i],outputs=[Q]);E.change(fn=update_config_states_table,inputs=[E],outputs=[R])
-	return I
+				U=gr.HTML('');V=gr.HTML(O);J.load(fn=update_config_states_table,inputs=[E],outputs=[V]);l.click(fn=save_config_state,inputs=[k],outputs=[E,U]);m=gr.Label(visible=_A);j.click(fn=restore_config_state,_js='config_state_confirm_restore',inputs=[m,E,i],outputs=[U]);E.change(fn=update_config_states_table,inputs=[E],outputs=[V])
+	return J

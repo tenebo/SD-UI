@@ -12,12 +12,12 @@ def javascript_html():
 	if shared.cmd_opts.theme:A+=f'<script type="text/javascript">set_theme("{shared.cmd_opts.theme}");</script>\n'
 	return A
 def css_html():
-	D='user.css';A=''
-	def B(fn):return f'<link rel="stylesheet" property="stylesheet" href="{webpath(fn)}">'
-	for C in scripts.list_files_with_name('style.css'):
-		if not os.path.isfile(C):continue
-		A+=B(C)
-	if os.path.exists(os.path.join(data_path,D)):A+=B(os.path.join(data_path,D))
+	B='user.css';A=''
+	def C(fn):return f'<link rel="stylesheet" property="stylesheet" href="{webpath(fn)}">'
+	for D in scripts.list_files_with_name('style.css'):
+		if not os.path.isfile(D):continue
+		A+=C(D)
+	if os.path.exists(os.path.join(data_path,B)):A+=C(os.path.join(data_path,B))
 	return A
 def reload_javascript():
 	C=javascript_html();D=css_html()
