@@ -1,110 +1,25 @@
+_B=True
+_A=False
 import gradio as gr
-
-from modules import shared, ui_common, ui_components, styles
-
-styles_edit_symbol = '\U0001f58c\uFE0F'  # 🖌️
-styles_materialize_symbol = '\U0001f4cb'  # 📋
-
-
-def select_style(name):
-    style = shared.prompt_styles.styles.get(name)
-    existing = style is not None
-    empty = not name
-
-    prompt = style.prompt if style else gr.update()
-    negative_prompt = style.negative_prompt if style else gr.update()
-
-    return prompt, negative_prompt, gr.update(visible=existing), gr.update(visible=not empty)
-
-
-def save_style(name, prompt, negative_prompt):
-    if not name:
-        return gr.update(visible=False)
-
-    style = styles.PromptStyle(name, prompt, negative_prompt)
-    shared.prompt_styles.styles[style.name] = style
-    shared.prompt_styles.save_styles(shared.styles_filename)
-
-    return gr.update(visible=True)
-
-
+from modules import shared,ui_common,ui_components,styles
+styles_edit_symbol='🖌️'
+styles_materialize_symbol='📋'
+def select_style(name):A=shared.prompt_styles.styles.get(name);B=A is not None;C=not name;D=A.prompt if A else gr.update();E=A.negative_prompt if A else gr.update();return D,E,gr.update(visible=B),gr.update(visible=not C)
+def save_style(name,prompt,negative_prompt):
+	if not name:return gr.update(visible=_A)
+	A=styles.PromptStyle(name,prompt,negative_prompt);shared.prompt_styles.styles[A.name]=A;shared.prompt_styles.save_styles(shared.styles_filename);return gr.update(visible=_B)
 def delete_style(name):
-    if name == "":
-        return
-
-    shared.prompt_styles.styles.pop(name, None)
-    shared.prompt_styles.save_styles(shared.styles_filename)
-
-    return '', '', ''
-
-
-def materialize_styles(prompt, negative_prompt, styles):
-    prompt = shared.prompt_styles.apply_styles_to_prompt(prompt, styles)
-    negative_prompt = shared.prompt_styles.apply_negative_styles_to_prompt(negative_prompt, styles)
-
-    return [gr.Textbox.update(value=prompt), gr.Textbox.update(value=negative_prompt), gr.Dropdown.update(value=[])]
-
-
-def refresh_styles():
-    return gr.update(choices=list(shared.prompt_styles.styles)), gr.update(choices=list(shared.prompt_styles.styles))
-
-
+	if name=='':return
+	shared.prompt_styles.styles.pop(name,None);shared.prompt_styles.save_styles(shared.styles_filename);return'','',''
+def materialize_styles(prompt,negative_prompt,styles):C=styles;B=negative_prompt;A=prompt;A=shared.prompt_styles.apply_styles_to_prompt(A,C);B=shared.prompt_styles.apply_negative_styles_to_prompt(B,C);return[gr.Textbox.update(value=A),gr.Textbox.update(value=B),gr.Dropdown.update(value=[])]
+def refresh_styles():return gr.update(choices=list(shared.prompt_styles.styles)),gr.update(choices=list(shared.prompt_styles.styles))
 class UiPromptStyles:
-    def __init__(self, tabname, main_ui_prompt, main_ui_negative_prompt):
-        self.tabname = tabname
-
-        with gr.Row(elem_id=f"{tabname}_styles_row"):
-            self.dropdown = gr.Dropdown(label="Styles", show_label=False, elem_id=f"{tabname}_styles", choices=list(shared.prompt_styles.styles), value=[], multiselect=True, tooltip="Styles")
-            edit_button = ui_components.ToolButton(value=styles_edit_symbol, elem_id=f"{tabname}_styles_edit_button", tooltip="Edit styles")
-
-        with gr.Box(elem_id=f"{tabname}_styles_dialog", elem_classes="popup-dialog") as styles_dialog:
-            with gr.Row():
-                self.selection = gr.Dropdown(label="Styles", elem_id=f"{tabname}_styles_edit_select", choices=list(shared.prompt_styles.styles), value=[], allow_custom_value=True, info="Styles allow you to add custom text to prompt. Use the {prompt} token in style text, and it will be replaced with user's prompt when applying style. Otherwise, style's text will be added to the end of the prompt.")
-                ui_common.create_refresh_button([self.dropdown, self.selection], shared.prompt_styles.reload, lambda: {"choices": list(shared.prompt_styles.styles)}, f"refresh_{tabname}_styles")
-                self.materialize = ui_components.ToolButton(value=styles_materialize_symbol, elem_id=f"{tabname}_style_apply", tooltip="Apply all selected styles from the style selction dropdown in main UI to the prompt.")
-
-            with gr.Row():
-                self.prompt = gr.Textbox(label="Prompt", show_label=True, elem_id=f"{tabname}_edit_style_prompt", lines=3)
-
-            with gr.Row():
-                self.neg_prompt = gr.Textbox(label="Negative prompt", show_label=True, elem_id=f"{tabname}_edit_style_neg_prompt", lines=3)
-
-            with gr.Row():
-                self.save = gr.Button('Save', variant='primary', elem_id=f'{tabname}_edit_style_save', visible=False)
-                self.delete = gr.Button('Delete', variant='primary', elem_id=f'{tabname}_edit_style_delete', visible=False)
-                self.close = gr.Button('Close', variant='secondary', elem_id=f'{tabname}_edit_style_close')
-
-        self.selection.change(
-            fn=select_style,
-            inputs=[self.selection],
-            outputs=[self.prompt, self.neg_prompt, self.delete, self.save],
-            show_progress=False,
-        )
-
-        self.save.click(
-            fn=save_style,
-            inputs=[self.selection, self.prompt, self.neg_prompt],
-            outputs=[self.delete],
-            show_progress=False,
-        ).then(refresh_styles, outputs=[self.dropdown, self.selection], show_progress=False)
-
-        self.delete.click(
-            fn=delete_style,
-            _js='function(name){ if(name == "") return ""; return confirm("Delete style " + name + "?") ? name : ""; }',
-            inputs=[self.selection],
-            outputs=[self.selection, self.prompt, self.neg_prompt],
-            show_progress=False,
-        ).then(refresh_styles, outputs=[self.dropdown, self.selection], show_progress=False)
-
-        self.materialize.click(
-            fn=materialize_styles,
-            inputs=[main_ui_prompt, main_ui_negative_prompt, self.dropdown],
-            outputs=[main_ui_prompt, main_ui_negative_prompt, self.dropdown],
-            show_progress=False,
-        ).then(fn=None, _js="function(){update_"+tabname+"_tokens(); closePopup();}", show_progress=False)
-
-        ui_common.setup_dialog(button_show=edit_button, dialog=styles_dialog, button_close=self.close)
-
-
-
-
+	def __init__(A,tabname,main_ui_prompt,main_ui_negative_prompt):
+		F='primary';E=main_ui_negative_prompt;D=main_ui_prompt;C='Styles';B=tabname;A.tabname=B
+		with gr.Row(elem_id=f"{B}_styles_row"):A.dropdown=gr.Dropdown(label=C,show_label=_A,elem_id=f"{B}_styles",choices=list(shared.prompt_styles.styles),value=[],multiselect=_B,tooltip=C);G=ui_components.ToolButton(value=styles_edit_symbol,elem_id=f"{B}_styles_edit_button",tooltip='Edit styles')
+		with gr.Box(elem_id=f"{B}_styles_dialog",elem_classes='popup-dialog')as H:
+			with gr.Row():A.selection=gr.Dropdown(label=C,elem_id=f"{B}_styles_edit_select",choices=list(shared.prompt_styles.styles),value=[],allow_custom_value=_B,info="Styles allow you to add custom text to prompt. Use the {prompt} token in style text, and it will be replaced with user's prompt when applying style. Otherwise, style's text will be added to the end of the prompt.");ui_common.create_refresh_button([A.dropdown,A.selection],shared.prompt_styles.reload,lambda:{'choices':list(shared.prompt_styles.styles)},f"refresh_{B}_styles");A.materialize=ui_components.ToolButton(value=styles_materialize_symbol,elem_id=f"{B}_style_apply",tooltip='Apply all selected styles from the style selction dropdown in main UI to the prompt.')
+			with gr.Row():A.prompt=gr.Textbox(label='Prompt',show_label=_B,elem_id=f"{B}_edit_style_prompt",lines=3)
+			with gr.Row():A.neg_prompt=gr.Textbox(label='Negative prompt',show_label=_B,elem_id=f"{B}_edit_style_neg_prompt",lines=3)
+			with gr.Row():A.save=gr.Button('Save',variant=F,elem_id=f"{B}_edit_style_save",visible=_A);A.delete=gr.Button('Delete',variant=F,elem_id=f"{B}_edit_style_delete",visible=_A);A.close=gr.Button('Close',variant='secondary',elem_id=f"{B}_edit_style_close")
+		A.selection.change(fn=select_style,inputs=[A.selection],outputs=[A.prompt,A.neg_prompt,A.delete,A.save],show_progress=_A);A.save.click(fn=save_style,inputs=[A.selection,A.prompt,A.neg_prompt],outputs=[A.delete],show_progress=_A).then(refresh_styles,outputs=[A.dropdown,A.selection],show_progress=_A);A.delete.click(fn=delete_style,_js='function(name){ if(name == "") return ""; return confirm("Delete style " + name + "?") ? name : ""; }',inputs=[A.selection],outputs=[A.selection,A.prompt,A.neg_prompt],show_progress=_A).then(refresh_styles,outputs=[A.dropdown,A.selection],show_progress=_A);A.materialize.click(fn=materialize_styles,inputs=[D,E,A.dropdown],outputs=[D,E,A.dropdown],show_progress=_A).then(fn=None,_js='function(){update_'+B+'_tokens(); closePopup();}',show_progress=_A);ui_common.setup_dialog(button_show=G,dialog=H,button_close=A.close)

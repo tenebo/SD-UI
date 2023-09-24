@@ -1,1443 +1,498 @@
-# This script is copied from the compvis/standard-demo repo (aka the SD V1 repo)
-# Original filename: ldm/models/diffusion/ddpm.py
-# The purpose to reinstate the old DDPM logic which works with VQ, whereas the V2 one doesn't
-# Some models such as LDSR require VQ to work correctly
-# The classes are suffixed with "V1" and added back to the "ldm.models.diffusion.ddpm" module
-
-import torch
-import torch.nn as nn
-import numpy as np
-import pytorch_lightning as pl
+_n='Progressive Generation'
+_m='class_label'
+_l='scale_factor'
+_k='denoise_row'
+_j='samples'
+_i='Plotting'
+_h='diffusion_row'
+_g='1 -> b'
+_f='inputs'
+_e='Sampling t'
+_d='c_concat'
+_c='original_image_size'
+_b='reducing stride'
+_a='reducing Kernel'
+_Z='vqf'
+_Y='patch_distributed_vq'
+_X='coordinates_bbox'
+_W='caption'
+_V='__is_unconditional__'
+_U='b n c h w -> (b n) c h w'
+_T='n b c h w -> b n c h w'
+_S='b h w c -> b c h w'
+_R='train'
+_Q='image'
+_P='linear'
+_O='adm'
+_N='hybrid'
+_M='stride'
+_L='ks'
+_K='split_input_params'
+_J='c_crossattn'
+_I='crossattn'
+_H='concat'
+_G='x0'
+_F='eps'
+_E=.0
+_D=1.
+_C=True
+_B=False
+_A=None
+import torch,torch.nn as nn,numpy as np,pytorch_lightning as pl
 from torch.optim.lr_scheduler import LambdaLR
-from einops import rearrange, repeat
+from einops import rearrange,repeat
 from contextlib import contextmanager
 from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
-
-from ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
+from ldm.util import log_txt_as_img,exists,default,ismap,isimage,mean_flat,count_params,instantiate_from_config
 from ldm.modules.ema import LitEma
-from ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianDistribution
-from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
-from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
+from ldm.modules.distributions.distributions import normal_kl,DiagonalGaussianDistribution
+from ldm.models.autoencoder import VQModelInterface,IdentityFirstStage,AutoencoderKL
+from ldm.modules.diffusionmodules.util import make_beta_schedule,extract_into_tensor,noise_like
 from ldm.models.diffusion.ddim import DDIMSampler
-
 import ldm.models.diffusion.ddpm
-
-__conditioning_keys__ = {'concat': 'c_concat',
-                         'crossattn': 'c_crossattn',
-                         'adm': 'y'}
-
-
-def disabled_train(self, mode=True):
-    """Overwrite model.train with this function to make sure train/eval mode
-    does not change anymore."""
-    return self
-
-
-def uniform_on_device(r1, r2, shape, device):
-    return (r1 - r2) * torch.rand(*shape, device=device) + r2
-
-
+__conditioning_keys__={_H:_d,_I:_J,_O:'y'}
+def disabled_train(self,mode=_C):'Overwrite model.train with this function to make sure train/eval mode\n    does not change anymore.';return self
+def uniform_on_device(r1,r2,shape,device):return(r1-r2)*torch.rand(*shape,device=device)+r2
 class DDPMV1(pl.LightningModule):
-    # classic DDPM with Gaussian diffusion, in image space
-    def __init__(self,
-                 unet_config,
-                 timesteps=1000,
-                 beta_schedule="linear",
-                 loss_type="l2",
-                 ckpt_path=None,
-                 ignore_keys=None,
-                 load_only_unet=False,
-                 monitor="val/loss",
-                 use_ema=True,
-                 first_stage_key="image",
-                 image_size=256,
-                 channels=3,
-                 log_every_t=100,
-                 clip_denoised=True,
-                 linear_start=1e-4,
-                 linear_end=2e-2,
-                 cosine_s=8e-3,
-                 given_betas=None,
-                 original_elbo_weight=0.,
-                 v_posterior=0.,  # weight for choosing posterior variance as sigma = (1-v) * beta_tilde + v * beta
-                 l_simple_weight=1.,
-                 conditioning_key=None,
-                 parameterization="eps",  # all assuming fixed variance schedules
-                 scheduler_config=None,
-                 use_positional_encodings=False,
-                 learn_logvar=False,
-                 logvar_init=0.,
-                 ):
-        super().__init__()
-        assert parameterization in ["eps", "x0"], 'currently only supporting "eps" and "x0"'
-        self.parameterization = parameterization
-        print(f"{self.__class__.__name__}: Running in {self.parameterization}-prediction mode")
-        self.cond_stage_model = None
-        self.clip_denoised = clip_denoised
-        self.log_every_t = log_every_t
-        self.first_stage_key = first_stage_key
-        self.image_size = image_size  # try conv?
-        self.channels = channels
-        self.use_positional_encodings = use_positional_encodings
-        self.model = DiffusionWrapperV1(unet_config, conditioning_key)
-        count_params(self.model, verbose=True)
-        self.use_ema = use_ema
-        if self.use_ema:
-            self.model_ema = LitEma(self.model)
-            print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
-
-        self.use_scheduler = scheduler_config is not None
-        if self.use_scheduler:
-            self.scheduler_config = scheduler_config
-
-        self.v_posterior = v_posterior
-        self.original_elbo_weight = original_elbo_weight
-        self.l_simple_weight = l_simple_weight
-
-        if monitor is not None:
-            self.monitor = monitor
-        if ckpt_path is not None:
-            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys or [], only_model=load_only_unet)
-
-        self.register_schedule(given_betas=given_betas, beta_schedule=beta_schedule, timesteps=timesteps,
-                               linear_start=linear_start, linear_end=linear_end, cosine_s=cosine_s)
-
-        self.loss_type = loss_type
-
-        self.learn_logvar = learn_logvar
-        self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,))
-        if self.learn_logvar:
-            self.logvar = nn.Parameter(self.logvar, requires_grad=True)
-
-
-    def register_schedule(self, given_betas=None, beta_schedule="linear", timesteps=1000,
-                          linear_start=1e-4, linear_end=2e-2, cosine_s=8e-3):
-        if exists(given_betas):
-            betas = given_betas
-        else:
-            betas = make_beta_schedule(beta_schedule, timesteps, linear_start=linear_start, linear_end=linear_end,
-                                       cosine_s=cosine_s)
-        alphas = 1. - betas
-        alphas_cumprod = np.cumprod(alphas, axis=0)
-        alphas_cumprod_prev = np.append(1., alphas_cumprod[:-1])
-
-        timesteps, = betas.shape
-        self.num_timesteps = int(timesteps)
-        self.linear_start = linear_start
-        self.linear_end = linear_end
-        assert alphas_cumprod.shape[0] == self.num_timesteps, 'alphas have to be defined for each timestep'
-
-        to_torch = partial(torch.tensor, dtype=torch.float32)
-
-        self.register_buffer('betas', to_torch(betas))
-        self.register_buffer('alphas_cumprod', to_torch(alphas_cumprod))
-        self.register_buffer('alphas_cumprod_prev', to_torch(alphas_cumprod_prev))
-
-        # calculations for diffusion q(x_t | x_{t-1}) and others
-        self.register_buffer('sqrt_alphas_cumprod', to_torch(np.sqrt(alphas_cumprod)))
-        self.register_buffer('sqrt_one_minus_alphas_cumprod', to_torch(np.sqrt(1. - alphas_cumprod)))
-        self.register_buffer('log_one_minus_alphas_cumprod', to_torch(np.log(1. - alphas_cumprod)))
-        self.register_buffer('sqrt_recip_alphas_cumprod', to_torch(np.sqrt(1. / alphas_cumprod)))
-        self.register_buffer('sqrt_recipm1_alphas_cumprod', to_torch(np.sqrt(1. / alphas_cumprod - 1)))
-
-        # calculations for posterior q(x_{t-1} | x_t, x_0)
-        posterior_variance = (1 - self.v_posterior) * betas * (1. - alphas_cumprod_prev) / (
-                    1. - alphas_cumprod) + self.v_posterior * betas
-        # above: equal to 1. / (1. / (1. - alpha_cumprod_tm1) + alpha_t / beta_t)
-        self.register_buffer('posterior_variance', to_torch(posterior_variance))
-        # below: log calculation clipped because the posterior variance is 0 at the beginning of the diffusion chain
-        self.register_buffer('posterior_log_variance_clipped', to_torch(np.log(np.maximum(posterior_variance, 1e-20))))
-        self.register_buffer('posterior_mean_coef1', to_torch(
-            betas * np.sqrt(alphas_cumprod_prev) / (1. - alphas_cumprod)))
-        self.register_buffer('posterior_mean_coef2', to_torch(
-            (1. - alphas_cumprod_prev) * np.sqrt(alphas) / (1. - alphas_cumprod)))
-
-        if self.parameterization == "eps":
-            lvlb_weights = self.betas ** 2 / (
-                        2 * self.posterior_variance * to_torch(alphas) * (1 - self.alphas_cumprod))
-        elif self.parameterization == "x0":
-            lvlb_weights = 0.5 * np.sqrt(torch.Tensor(alphas_cumprod)) / (2. * 1 - torch.Tensor(alphas_cumprod))
-        else:
-            raise NotImplementedError("mu not supported")
-        # TODO how to choose this term
-        lvlb_weights[0] = lvlb_weights[1]
-        self.register_buffer('lvlb_weights', lvlb_weights, persistent=False)
-        assert not torch.isnan(self.lvlb_weights).all()
-
-    @contextmanager
-    def ema_scope(self, context=None):
-        if self.use_ema:
-            self.model_ema.store(self.model.parameters())
-            self.model_ema.copy_to(self.model)
-            if context is not None:
-                print(f"{context}: Switched to EMA weights")
-        try:
-            yield None
-        finally:
-            if self.use_ema:
-                self.model_ema.restore(self.model.parameters())
-                if context is not None:
-                    print(f"{context}: Restored training weights")
-
-    def init_from_ckpt(self, path, ignore_keys=None, only_model=False):
-        sd = torch.load(path, map_location="cpu")
-        if "state_dict" in list(sd.keys()):
-            sd = sd["state_dict"]
-        keys = list(sd.keys())
-        for k in keys:
-            for ik in ignore_keys or []:
-                if k.startswith(ik):
-                    print("Deleting key {} from state_dict.".format(k))
-                    del sd[k]
-        missing, unexpected = self.load_state_dict(sd, strict=False) if not only_model else self.model.load_state_dict(
-            sd, strict=False)
-        print(f"Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys")
-        if missing:
-            print(f"Missing Keys: {missing}")
-        if unexpected:
-            print(f"Unexpected Keys: {unexpected}")
-
-    def q_mean_variance(self, x_start, t):
-        """
-        Get the distribution q(x_t | x_0).
-        :param x_start: the [N x C x ...] tensor of noiseless inputs.
-        :param t: the number of diffusion steps (minus 1). Here, 0 means one step.
-        :return: A tuple (mean, variance, log_variance), all of x_start's shape.
-        """
-        mean = (extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start)
-        variance = extract_into_tensor(1.0 - self.alphas_cumprod, t, x_start.shape)
-        log_variance = extract_into_tensor(self.log_one_minus_alphas_cumprod, t, x_start.shape)
-        return mean, variance, log_variance
-
-    def predict_start_from_noise(self, x_t, t, noise):
-        return (
-                extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t -
-                extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * noise
-        )
-
-    def q_posterior(self, x_start, x_t, t):
-        posterior_mean = (
-                extract_into_tensor(self.posterior_mean_coef1, t, x_t.shape) * x_start +
-                extract_into_tensor(self.posterior_mean_coef2, t, x_t.shape) * x_t
-        )
-        posterior_variance = extract_into_tensor(self.posterior_variance, t, x_t.shape)
-        posterior_log_variance_clipped = extract_into_tensor(self.posterior_log_variance_clipped, t, x_t.shape)
-        return posterior_mean, posterior_variance, posterior_log_variance_clipped
-
-    def p_mean_variance(self, x, t, clip_denoised: bool):
-        model_out = self.model(x, t)
-        if self.parameterization == "eps":
-            x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
-        elif self.parameterization == "x0":
-            x_recon = model_out
-        if clip_denoised:
-            x_recon.clamp_(-1., 1.)
-
-        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
-        return model_mean, posterior_variance, posterior_log_variance
-
-    @torch.no_grad()
-    def p_sample(self, x, t, clip_denoised=True, repeat_noise=False):
-        b, *_, device = *x.shape, x.device
-        model_mean, _, model_log_variance = self.p_mean_variance(x=x, t=t, clip_denoised=clip_denoised)
-        noise = noise_like(x.shape, device, repeat_noise)
-        # no noise when t == 0
-        nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
-        return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
-
-    @torch.no_grad()
-    def p_sample_loop(self, shape, return_intermediates=False):
-        device = self.betas.device
-        b = shape[0]
-        img = torch.randn(shape, device=device)
-        intermediates = [img]
-        for i in tqdm(reversed(range(0, self.num_timesteps)), desc='Sampling t', total=self.num_timesteps):
-            img = self.p_sample(img, torch.full((b,), i, device=device, dtype=torch.long),
-                                clip_denoised=self.clip_denoised)
-            if i % self.log_every_t == 0 or i == self.num_timesteps - 1:
-                intermediates.append(img)
-        if return_intermediates:
-            return img, intermediates
-        return img
-
-    @torch.no_grad()
-    def sample(self, batch_size=16, return_intermediates=False):
-        image_size = self.image_size
-        channels = self.channels
-        return self.p_sample_loop((batch_size, channels, image_size, image_size),
-                                  return_intermediates=return_intermediates)
-
-    def q_sample(self, x_start, t, noise=None):
-        noise = default(noise, lambda: torch.randn_like(x_start))
-        return (extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start +
-                extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise)
-
-    def get_loss(self, pred, target, mean=True):
-        if self.loss_type == 'l1':
-            loss = (target - pred).abs()
-            if mean:
-                loss = loss.mean()
-        elif self.loss_type == 'l2':
-            if mean:
-                loss = torch.nn.functional.mse_loss(target, pred)
-            else:
-                loss = torch.nn.functional.mse_loss(target, pred, reduction='none')
-        else:
-            raise NotImplementedError("unknown loss type '{loss_type}'")
-
-        return loss
-
-    def p_losses(self, x_start, t, noise=None):
-        noise = default(noise, lambda: torch.randn_like(x_start))
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        model_out = self.model(x_noisy, t)
-
-        loss_dict = {}
-        if self.parameterization == "eps":
-            target = noise
-        elif self.parameterization == "x0":
-            target = x_start
-        else:
-            raise NotImplementedError(f"Paramterization {self.parameterization} not yet supported")
-
-        loss = self.get_loss(model_out, target, mean=False).mean(dim=[1, 2, 3])
-
-        log_prefix = 'train' if self.training else 'val'
-
-        loss_dict.update({f'{log_prefix}/loss_simple': loss.mean()})
-        loss_simple = loss.mean() * self.l_simple_weight
-
-        loss_vlb = (self.lvlb_weights[t] * loss).mean()
-        loss_dict.update({f'{log_prefix}/loss_vlb': loss_vlb})
-
-        loss = loss_simple + self.original_elbo_weight * loss_vlb
-
-        loss_dict.update({f'{log_prefix}/loss': loss})
-
-        return loss, loss_dict
-
-    def forward(self, x, *args, **kwargs):
-        # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size
-        # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
-        t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
-        return self.p_losses(x, t, *args, **kwargs)
-
-    def get_input(self, batch, k):
-        x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
-        x = x.to(memory_format=torch.contiguous_format).float()
-        return x
-
-    def shared_step(self, batch):
-        x = self.get_input(batch, self.first_stage_key)
-        loss, loss_dict = self(x)
-        return loss, loss_dict
-
-    def training_step(self, batch, batch_idx):
-        loss, loss_dict = self.shared_step(batch)
-
-        self.log_dict(loss_dict, prog_bar=True,
-                      logger=True, on_step=True, on_epoch=True)
-
-        self.log("global_step", self.global_step,
-                 prog_bar=True, logger=True, on_step=True, on_epoch=False)
-
-        if self.use_scheduler:
-            lr = self.optimizers().param_groups[0]['lr']
-            self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-
-        return loss
-
-    @torch.no_grad()
-    def validation_step(self, batch, batch_idx):
-        _, loss_dict_no_ema = self.shared_step(batch)
-        with self.ema_scope():
-            _, loss_dict_ema = self.shared_step(batch)
-            loss_dict_ema = {key + '_ema': loss_dict_ema[key] for key in loss_dict_ema}
-        self.log_dict(loss_dict_no_ema, prog_bar=False, logger=True, on_step=False, on_epoch=True)
-        self.log_dict(loss_dict_ema, prog_bar=False, logger=True, on_step=False, on_epoch=True)
-
-    def on_train_batch_end(self, *args, **kwargs):
-        if self.use_ema:
-            self.model_ema(self.model)
-
-    def _get_rows_from_list(self, samples):
-        n_imgs_per_row = len(samples)
-        denoise_grid = rearrange(samples, 'n b c h w -> b n c h w')
-        denoise_grid = rearrange(denoise_grid, 'b n c h w -> (b n) c h w')
-        denoise_grid = make_grid(denoise_grid, nrow=n_imgs_per_row)
-        return denoise_grid
-
-    @torch.no_grad()
-    def log_images(self, batch, N=8, n_row=2, sample=True, return_keys=None, **kwargs):
-        log = {}
-        x = self.get_input(batch, self.first_stage_key)
-        N = min(x.shape[0], N)
-        n_row = min(x.shape[0], n_row)
-        x = x.to(self.device)[:N]
-        log["inputs"] = x
-
-        # get diffusion row
-        diffusion_row = []
-        x_start = x[:n_row]
-
-        for t in range(self.num_timesteps):
-            if t % self.log_every_t == 0 or t == self.num_timesteps - 1:
-                t = repeat(torch.tensor([t]), '1 -> b', b=n_row)
-                t = t.to(self.device).long()
-                noise = torch.randn_like(x_start)
-                x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-                diffusion_row.append(x_noisy)
-
-        log["diffusion_row"] = self._get_rows_from_list(diffusion_row)
-
-        if sample:
-            # get denoise row
-            with self.ema_scope("Plotting"):
-                samples, denoise_row = self.sample(batch_size=N, return_intermediates=True)
-
-            log["samples"] = samples
-            log["denoise_row"] = self._get_rows_from_list(denoise_row)
-
-        if return_keys:
-            if np.intersect1d(list(log.keys()), return_keys).shape[0] == 0:
-                return log
-            else:
-                return {key: log[key] for key in return_keys}
-        return log
-
-    def configure_optimizers(self):
-        lr = self.learning_rate
-        params = list(self.model.parameters())
-        if self.learn_logvar:
-            params = params + [self.logvar]
-        opt = torch.optim.AdamW(params, lr=lr)
-        return opt
-
-
+	def __init__(A,unet_config,timesteps=1000,beta_schedule=_P,loss_type='l2',ckpt_path=_A,ignore_keys=_A,load_only_unet=_B,monitor='val/loss',use_ema=_C,first_stage_key=_Q,image_size=256,channels=3,log_every_t=100,clip_denoised=_C,linear_start=.0001,linear_end=.02,cosine_s=.008,given_betas=_A,original_elbo_weight=_E,v_posterior=_E,l_simple_weight=_D,conditioning_key=_A,parameterization=_F,scheduler_config=_A,use_positional_encodings=_B,learn_logvar=_B,logvar_init=_E):
+		E=scheduler_config;D=parameterization;C=monitor;B=ckpt_path;super().__init__();assert D in[_F,_G],'currently only supporting "eps" and "x0"';A.parameterization=D;print(f"{A.__class__.__name__}: Running in {A.parameterization}-prediction mode");A.cond_stage_model=_A;A.clip_denoised=clip_denoised;A.log_every_t=log_every_t;A.first_stage_key=first_stage_key;A.image_size=image_size;A.channels=channels;A.use_positional_encodings=use_positional_encodings;A.model=DiffusionWrapperV1(unet_config,conditioning_key);count_params(A.model,verbose=_C);A.use_ema=use_ema
+		if A.use_ema:A.model_ema=LitEma(A.model);print(f"Keeping EMAs of {len(list(A.model_ema.buffers()))}.")
+		A.use_scheduler=E is not _A
+		if A.use_scheduler:A.scheduler_config=E
+		A.v_posterior=v_posterior;A.original_elbo_weight=original_elbo_weight;A.l_simple_weight=l_simple_weight
+		if C is not _A:A.monitor=C
+		if B is not _A:A.init_from_ckpt(B,ignore_keys=ignore_keys or[],only_model=load_only_unet)
+		A.register_schedule(given_betas=given_betas,beta_schedule=beta_schedule,timesteps=timesteps,linear_start=linear_start,linear_end=linear_end,cosine_s=cosine_s);A.loss_type=loss_type;A.learn_logvar=learn_logvar;A.logvar=torch.full(fill_value=logvar_init,size=(A.num_timesteps,))
+		if A.learn_logvar:A.logvar=nn.Parameter(A.logvar,requires_grad=_C)
+	def register_schedule(A,given_betas=_A,beta_schedule=_P,timesteps=1000,linear_start=.0001,linear_end=.02,cosine_s=.008):
+		K=linear_end;J=linear_start;I=given_betas;G=timesteps
+		if exists(I):D=I
+		else:D=make_beta_schedule(beta_schedule,G,linear_start=J,linear_end=K,cosine_s=cosine_s)
+		H=_D-D;B=np.cumprod(H,axis=0);E=np.append(_D,B[:-1]);G,=D.shape;A.num_timesteps=int(G);A.linear_start=J;A.linear_end=K;assert B.shape[0]==A.num_timesteps,'alphas have to be defined for each timestep';C=partial(torch.tensor,dtype=torch.float32);A.register_buffer('betas',C(D));A.register_buffer('alphas_cumprod',C(B));A.register_buffer('alphas_cumprod_prev',C(E));A.register_buffer('sqrt_alphas_cumprod',C(np.sqrt(B)));A.register_buffer('sqrt_one_minus_alphas_cumprod',C(np.sqrt(_D-B)));A.register_buffer('log_one_minus_alphas_cumprod',C(np.log(_D-B)));A.register_buffer('sqrt_recip_alphas_cumprod',C(np.sqrt(_D/B)));A.register_buffer('sqrt_recipm1_alphas_cumprod',C(np.sqrt(_D/B-1)));L=(1-A.v_posterior)*D*(_D-E)/(_D-B)+A.v_posterior*D;A.register_buffer('posterior_variance',C(L));A.register_buffer('posterior_log_variance_clipped',C(np.log(np.maximum(L,1e-20))));A.register_buffer('posterior_mean_coef1',C(D*np.sqrt(E)/(_D-B)));A.register_buffer('posterior_mean_coef2',C((_D-E)*np.sqrt(H)/(_D-B)))
+		if A.parameterization==_F:F=A.betas**2/(2*A.posterior_variance*C(H)*(1-A.alphas_cumprod))
+		elif A.parameterization==_G:F=.5*np.sqrt(torch.Tensor(B))/(2.*1-torch.Tensor(B))
+		else:raise NotImplementedError('mu not supported')
+		F[0]=F[1];A.register_buffer('lvlb_weights',F,persistent=_B);assert not torch.isnan(A.lvlb_weights).all()
+	@contextmanager
+	def ema_scope(self,context=_A):
+		B=context;A=self
+		if A.use_ema:
+			A.model_ema.store(A.model.parameters());A.model_ema.copy_to(A.model)
+			if B is not _A:print(f"{B}: Switched to EMA weights")
+		try:yield _A
+		finally:
+			if A.use_ema:
+				A.model_ema.restore(A.model.parameters())
+				if B is not _A:print(f"{B}: Restored training weights")
+	def init_from_ckpt(E,path,ignore_keys=_A,only_model=_B):
+		F='state_dict';A=torch.load(path,map_location='cpu')
+		if F in list(A.keys()):A=A[F]
+		G=list(A.keys())
+		for B in G:
+			for H in ignore_keys or[]:
+				if B.startswith(H):print('Deleting key {} from state_dict.'.format(B));del A[B]
+		C,D=E.load_state_dict(A,strict=_B)if not only_model else E.model.load_state_dict(A,strict=_B);print(f"Restored from {path} with {len(C)} missing and {len(D)} unexpected keys")
+		if C:print(f"Missing Keys: {C}")
+		if D:print(f"Unexpected Keys: {D}")
+	def q_mean_variance(B,x_start,t):"\n        Get the distribution q(x_t | x_0).\n        :param x_start: the [N x C x ...] tensor of noiseless inputs.\n        :param t: the number of diffusion steps (minus 1). Here, 0 means one step.\n        :return: A tuple (mean, variance, log_variance), all of x_start's shape.\n        ";A=x_start;C=extract_into_tensor(B.sqrt_alphas_cumprod,t,A.shape)*A;D=extract_into_tensor(_D-B.alphas_cumprod,t,A.shape);E=extract_into_tensor(B.log_one_minus_alphas_cumprod,t,A.shape);return C,D,E
+	def predict_start_from_noise(B,x_t,t,noise):A=x_t;return extract_into_tensor(B.sqrt_recip_alphas_cumprod,t,A.shape)*A-extract_into_tensor(B.sqrt_recipm1_alphas_cumprod,t,A.shape)*noise
+	def q_posterior(B,x_start,x_t,t):A=x_t;C=extract_into_tensor(B.posterior_mean_coef1,t,A.shape)*x_start+extract_into_tensor(B.posterior_mean_coef2,t,A.shape)*A;D=extract_into_tensor(B.posterior_variance,t,A.shape);E=extract_into_tensor(B.posterior_log_variance_clipped,t,A.shape);return C,D,E
+	def p_mean_variance(A,x,t,clip_denoised):
+		C=A.model(x,t)
+		if A.parameterization==_F:B=A.predict_start_from_noise(x,t=t,noise=C)
+		elif A.parameterization==_G:B=C
+		if clip_denoised:B.clamp_(-_D,_D)
+		D,E,F=A.q_posterior(x_start=B,x_t=x,t=t);return D,E,F
+	@torch.no_grad()
+	def p_sample(self,x,t,clip_denoised=_C,repeat_noise=_B):A,*B,C=*x.shape,x.device;D,B,E=self.p_mean_variance(x=x,t=t,clip_denoised=clip_denoised);F=noise_like(x.shape,C,repeat_noise);G=(1-(t==0).float()).reshape(A,*(1,)*(len(x.shape)-1));return D+G*(.5*E).exp()*F
+	@torch.no_grad()
+	def p_sample_loop(self,shape,return_intermediates=_B):
+		D=shape;A=self;E=A.betas.device;G=D[0];B=torch.randn(D,device=E);F=[B]
+		for C in tqdm(reversed(range(0,A.num_timesteps)),desc=_e,total=A.num_timesteps):
+			B=A.p_sample(B,torch.full((G,),C,device=E,dtype=torch.long),clip_denoised=A.clip_denoised)
+			if C%A.log_every_t==0 or C==A.num_timesteps-1:F.append(B)
+		if return_intermediates:return B,F
+		return B
+	@torch.no_grad()
+	def sample(self,batch_size=16,return_intermediates=_B):A=self;B=A.image_size;C=A.channels;return A.p_sample_loop((batch_size,C,B,B),return_intermediates=return_intermediates)
+	def q_sample(C,x_start,t,noise=_A):B=noise;A=x_start;B=default(B,lambda:torch.randn_like(A));return extract_into_tensor(C.sqrt_alphas_cumprod,t,A.shape)*A+extract_into_tensor(C.sqrt_one_minus_alphas_cumprod,t,A.shape)*B
+	def get_loss(D,pred,target,mean=_C):
+		C=target;B=pred
+		if D.loss_type=='l1':
+			A=(C-B).abs()
+			if mean:A=A.mean()
+		elif D.loss_type=='l2':
+			if mean:A=torch.nn.functional.mse_loss(C,B)
+			else:A=torch.nn.functional.mse_loss(C,B,reduction='none')
+		else:raise NotImplementedError("unknown loss type '{loss_type}'")
+		return A
+	def p_losses(A,x_start,t,noise=_A):
+		E=x_start;C=noise;C=default(C,lambda:torch.randn_like(E));I=A.q_sample(x_start=E,t=t,noise=C);J=A.model(I,t);D={}
+		if A.parameterization==_F:G=C
+		elif A.parameterization==_G:G=E
+		else:raise NotImplementedError(f"Paramterization {A.parameterization} not yet supported")
+		B=A.get_loss(J,G,mean=_B).mean(dim=[1,2,3]);F=_R if A.training else'val';D.update({f"{F}/loss_simple":B.mean()});K=B.mean()*A.l_simple_weight;H=(A.lvlb_weights[t]*B).mean();D.update({f"{F}/loss_vlb":H});B=K+A.original_elbo_weight*H;D.update({f"{F}/loss":B});return B,D
+	def forward(A,x,*B,**C):D=torch.randint(0,A.num_timesteps,(x.shape[0],),device=A.device).long();return A.p_losses(x,D,*B,**C)
+	def get_input(B,batch,k):
+		A=batch[k]
+		if len(A.shape)==3:A=A[...,_A]
+		A=rearrange(A,_S);A=A.to(memory_format=torch.contiguous_format).float();return A
+	def shared_step(A,batch):B=A.get_input(batch,A.first_stage_key);C,D=A(B);return C,D
+	def training_step(A,batch,batch_idx):
+		B,C=A.shared_step(batch);A.log_dict(C,prog_bar=_C,logger=_C,on_step=_C,on_epoch=_C);A.log('global_step',A.global_step,prog_bar=_C,logger=_C,on_step=_C,on_epoch=_B)
+		if A.use_scheduler:D=A.optimizers().param_groups[0]['lr'];A.log('lr_abs',D,prog_bar=_C,logger=_C,on_step=_C,on_epoch=_B)
+		return B
+	@torch.no_grad()
+	def validation_step(self,batch,batch_idx):
+		C=batch;A=self;D,E=A.shared_step(C)
+		with A.ema_scope():D,B=A.shared_step(C);B={A+'_ema':B[A]for A in B}
+		A.log_dict(E,prog_bar=_B,logger=_C,on_step=_B,on_epoch=_C);A.log_dict(B,prog_bar=_B,logger=_C,on_step=_B,on_epoch=_C)
+	def on_train_batch_end(A,*B,**C):
+		if A.use_ema:A.model_ema(A.model)
+	def _get_rows_from_list(D,samples):B=samples;C=len(B);A=rearrange(B,_T);A=rearrange(A,_U);A=make_grid(A,nrow=C);return A
+	@torch.no_grad()
+	def log_images(self,batch,N=8,n_row=2,sample=_C,return_keys=_A,**M):
+		F=return_keys;E=n_row;A=self;B={};D=A.get_input(batch,A.first_stage_key);N=min(D.shape[0],N);E=min(D.shape[0],E);D=D.to(A.device)[:N];B[_f]=D;G=[];H=D[:E]
+		for C in range(A.num_timesteps):
+			if C%A.log_every_t==0 or C==A.num_timesteps-1:C=repeat(torch.tensor([C]),_g,b=E);C=C.to(A.device).long();I=torch.randn_like(H);J=A.q_sample(x_start=H,t=C,noise=I);G.append(J)
+		B[_h]=A._get_rows_from_list(G)
+		if sample:
+			with A.ema_scope(_i):K,L=A.sample(batch_size=N,return_intermediates=_C)
+			B[_j]=K;B[_k]=A._get_rows_from_list(L)
+		if F:
+			if np.intersect1d(list(B.keys()),F).shape[0]==0:return B
+			else:return{A:B[A]for A in F}
+		return B
+	def configure_optimizers(A):
+		C=A.learning_rate;B=list(A.model.parameters())
+		if A.learn_logvar:B=B+[A.logvar]
+		D=torch.optim.AdamW(B,lr=C);return D
 class LatentDiffusionV1(DDPMV1):
-    """main class"""
-    def __init__(self,
-                 first_stage_config,
-                 cond_stage_config,
-                 num_timesteps_cond=None,
-                 cond_stage_key="image",
-                 cond_stage_trainable=False,
-                 concat_mode=True,
-                 cond_stage_forward=None,
-                 conditioning_key=None,
-                 scale_factor=1.0,
-                 scale_by_std=False,
-                 *args, **kwargs):
-        self.num_timesteps_cond = default(num_timesteps_cond, 1)
-        self.scale_by_std = scale_by_std
-        assert self.num_timesteps_cond <= kwargs['timesteps']
-        # for backwards compatibility after implementation of DiffusionWrapper
-        if conditioning_key is None:
-            conditioning_key = 'concat' if concat_mode else 'crossattn'
-        if cond_stage_config == '__is_unconditional__':
-            conditioning_key = None
-        ckpt_path = kwargs.pop("ckpt_path", None)
-        ignore_keys = kwargs.pop("ignore_keys", [])
-        super().__init__(*args, conditioning_key=conditioning_key, **kwargs)
-        self.concat_mode = concat_mode
-        self.cond_stage_trainable = cond_stage_trainable
-        self.cond_stage_key = cond_stage_key
-        try:
-            self.num_downs = len(first_stage_config.params.ddconfig.ch_mult) - 1
-        except Exception:
-            self.num_downs = 0
-        if not scale_by_std:
-            self.scale_factor = scale_factor
-        else:
-            self.register_buffer('scale_factor', torch.tensor(scale_factor))
-        self.instantiate_first_stage(first_stage_config)
-        self.instantiate_cond_stage(cond_stage_config)
-        self.cond_stage_forward = cond_stage_forward
-        self.clip_denoised = False
-        self.bbox_tokenizer = None
-
-        self.restarted_from_ckpt = False
-        if ckpt_path is not None:
-            self.init_from_ckpt(ckpt_path, ignore_keys)
-            self.restarted_from_ckpt = True
-
-    def make_cond_schedule(self, ):
-        self.cond_ids = torch.full(size=(self.num_timesteps,), fill_value=self.num_timesteps - 1, dtype=torch.long)
-        ids = torch.round(torch.linspace(0, self.num_timesteps - 1, self.num_timesteps_cond)).long()
-        self.cond_ids[:self.num_timesteps_cond] = ids
-
-    @rank_zero_only
-    @torch.no_grad()
-    def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
-        # only for very first batch
-        if self.scale_by_std and self.current_epoch == 0 and self.global_step == 0 and batch_idx == 0 and not self.restarted_from_ckpt:
-            assert self.scale_factor == 1., 'rather not use custom rescaling and std-rescaling simultaneously'
-            # set rescale weight to 1./std of encodings
-            print("### USING STD-RESCALING ###")
-            x = super().get_input(batch, self.first_stage_key)
-            x = x.to(self.device)
-            encoder_posterior = self.encode_first_stage(x)
-            z = self.get_first_stage_encoding(encoder_posterior).detach()
-            del self.scale_factor
-            self.register_buffer('scale_factor', 1. / z.flatten().std())
-            print(f"setting self.scale_factor to {self.scale_factor}")
-            print("### USING STD-RESCALING ###")
-
-    def register_schedule(self,
-                          given_betas=None, beta_schedule="linear", timesteps=1000,
-                          linear_start=1e-4, linear_end=2e-2, cosine_s=8e-3):
-        super().register_schedule(given_betas, beta_schedule, timesteps, linear_start, linear_end, cosine_s)
-
-        self.shorten_cond_schedule = self.num_timesteps_cond > 1
-        if self.shorten_cond_schedule:
-            self.make_cond_schedule()
-
-    def instantiate_first_stage(self, config):
-        model = instantiate_from_config(config)
-        self.first_stage_model = model.eval()
-        self.first_stage_model.train = disabled_train
-        for param in self.first_stage_model.parameters():
-            param.requires_grad = False
-
-    def instantiate_cond_stage(self, config):
-        if not self.cond_stage_trainable:
-            if config == "__is_first_stage__":
-                print("Using first stage also as cond stage.")
-                self.cond_stage_model = self.first_stage_model
-            elif config == "__is_unconditional__":
-                print(f"Training {self.__class__.__name__} as an unconditional model.")
-                self.cond_stage_model = None
-                # self.be_unconditional = True
-            else:
-                model = instantiate_from_config(config)
-                self.cond_stage_model = model.eval()
-                self.cond_stage_model.train = disabled_train
-                for param in self.cond_stage_model.parameters():
-                    param.requires_grad = False
-        else:
-            assert config != '__is_first_stage__'
-            assert config != '__is_unconditional__'
-            model = instantiate_from_config(config)
-            self.cond_stage_model = model
-
-    def _get_denoise_row_from_list(self, samples, desc='', force_no_decoder_quantization=False):
-        denoise_row = []
-        for zd in tqdm(samples, desc=desc):
-            denoise_row.append(self.decode_first_stage(zd.to(self.device),
-                                                            force_not_quantize=force_no_decoder_quantization))
-        n_imgs_per_row = len(denoise_row)
-        denoise_row = torch.stack(denoise_row)  # n_log_step, n_row, C, H, W
-        denoise_grid = rearrange(denoise_row, 'n b c h w -> b n c h w')
-        denoise_grid = rearrange(denoise_grid, 'b n c h w -> (b n) c h w')
-        denoise_grid = make_grid(denoise_grid, nrow=n_imgs_per_row)
-        return denoise_grid
-
-    def get_first_stage_encoding(self, encoder_posterior):
-        if isinstance(encoder_posterior, DiagonalGaussianDistribution):
-            z = encoder_posterior.sample()
-        elif isinstance(encoder_posterior, torch.Tensor):
-            z = encoder_posterior
-        else:
-            raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
-        return self.scale_factor * z
-
-    def get_learned_conditioning(self, c):
-        if self.cond_stage_forward is None:
-            if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
-                c = self.cond_stage_model.encode(c)
-                if isinstance(c, DiagonalGaussianDistribution):
-                    c = c.mode()
-            else:
-                c = self.cond_stage_model(c)
-        else:
-            assert hasattr(self.cond_stage_model, self.cond_stage_forward)
-            c = getattr(self.cond_stage_model, self.cond_stage_forward)(c)
-        return c
-
-    def meshgrid(self, h, w):
-        y = torch.arange(0, h).view(h, 1, 1).repeat(1, w, 1)
-        x = torch.arange(0, w).view(1, w, 1).repeat(h, 1, 1)
-
-        arr = torch.cat([y, x], dim=-1)
-        return arr
-
-    def delta_border(self, h, w):
-        """
-        :param h: height
-        :param w: width
-        :return: normalized distance to image border,
-         wtith min distance = 0 at border and max dist = 0.5 at image center
-        """
-        lower_right_corner = torch.tensor([h - 1, w - 1]).view(1, 1, 2)
-        arr = self.meshgrid(h, w) / lower_right_corner
-        dist_left_up = torch.min(arr, dim=-1, keepdims=True)[0]
-        dist_right_down = torch.min(1 - arr, dim=-1, keepdims=True)[0]
-        edge_dist = torch.min(torch.cat([dist_left_up, dist_right_down], dim=-1), dim=-1)[0]
-        return edge_dist
-
-    def get_weighting(self, h, w, Ly, Lx, device):
-        weighting = self.delta_border(h, w)
-        weighting = torch.clip(weighting, self.split_input_params["clip_min_weight"],
-                               self.split_input_params["clip_max_weight"], )
-        weighting = weighting.view(1, h * w, 1).repeat(1, 1, Ly * Lx).to(device)
-
-        if self.split_input_params["tie_braker"]:
-            L_weighting = self.delta_border(Ly, Lx)
-            L_weighting = torch.clip(L_weighting,
-                                     self.split_input_params["clip_min_tie_weight"],
-                                     self.split_input_params["clip_max_tie_weight"])
-
-            L_weighting = L_weighting.view(1, 1, Ly * Lx).to(device)
-            weighting = weighting * L_weighting
-        return weighting
-
-    def get_fold_unfold(self, x, kernel_size, stride, uf=1, df=1):  # todo load once not every time, shorten code
-        """
-        :param x: img of size (bs, c, h, w)
-        :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])
-        """
-        bs, nc, h, w = x.shape
-
-        # number of crops in image
-        Ly = (h - kernel_size[0]) // stride[0] + 1
-        Lx = (w - kernel_size[1]) // stride[1] + 1
-
-        if uf == 1 and df == 1:
-            fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
-            unfold = torch.nn.Unfold(**fold_params)
-
-            fold = torch.nn.Fold(output_size=x.shape[2:], **fold_params)
-
-            weighting = self.get_weighting(kernel_size[0], kernel_size[1], Ly, Lx, x.device).to(x.dtype)
-            normalization = fold(weighting).view(1, 1, h, w)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0], kernel_size[1], Ly * Lx))
-
-        elif uf > 1 and df == 1:
-            fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
-            unfold = torch.nn.Unfold(**fold_params)
-
-            fold_params2 = dict(kernel_size=(kernel_size[0] * uf, kernel_size[0] * uf),
-                                dilation=1, padding=0,
-                                stride=(stride[0] * uf, stride[1] * uf))
-            fold = torch.nn.Fold(output_size=(x.shape[2] * uf, x.shape[3] * uf), **fold_params2)
-
-            weighting = self.get_weighting(kernel_size[0] * uf, kernel_size[1] * uf, Ly, Lx, x.device).to(x.dtype)
-            normalization = fold(weighting).view(1, 1, h * uf, w * uf)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0] * uf, kernel_size[1] * uf, Ly * Lx))
-
-        elif df > 1 and uf == 1:
-            fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
-            unfold = torch.nn.Unfold(**fold_params)
-
-            fold_params2 = dict(kernel_size=(kernel_size[0] // df, kernel_size[0] // df),
-                                dilation=1, padding=0,
-                                stride=(stride[0] // df, stride[1] // df))
-            fold = torch.nn.Fold(output_size=(x.shape[2] // df, x.shape[3] // df), **fold_params2)
-
-            weighting = self.get_weighting(kernel_size[0] // df, kernel_size[1] // df, Ly, Lx, x.device).to(x.dtype)
-            normalization = fold(weighting).view(1, 1, h // df, w // df)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0] // df, kernel_size[1] // df, Ly * Lx))
-
-        else:
-            raise NotImplementedError
-
-        return fold, unfold, normalization, weighting
-
-    @torch.no_grad()
-    def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
-                  cond_key=None, return_original_cond=False, bs=None):
-        x = super().get_input(batch, k)
-        if bs is not None:
-            x = x[:bs]
-        x = x.to(self.device)
-        encoder_posterior = self.encode_first_stage(x)
-        z = self.get_first_stage_encoding(encoder_posterior).detach()
-
-        if self.model.conditioning_key is not None:
-            if cond_key is None:
-                cond_key = self.cond_stage_key
-            if cond_key != self.first_stage_key:
-                if cond_key in ['caption', 'coordinates_bbox']:
-                    xc = batch[cond_key]
-                elif cond_key == 'class_label':
-                    xc = batch
-                else:
-                    xc = super().get_input(batch, cond_key).to(self.device)
-            else:
-                xc = x
-            if not self.cond_stage_trainable or force_c_encode:
-                if isinstance(xc, dict) or isinstance(xc, list):
-                    # import pudb; pudb.set_trace()
-                    c = self.get_learned_conditioning(xc)
-                else:
-                    c = self.get_learned_conditioning(xc.to(self.device))
-            else:
-                c = xc
-            if bs is not None:
-                c = c[:bs]
-
-            if self.use_positional_encodings:
-                pos_x, pos_y = self.compute_latent_shifts(batch)
-                ckey = __conditioning_keys__[self.model.conditioning_key]
-                c = {ckey: c, 'pos_x': pos_x, 'pos_y': pos_y}
-
-        else:
-            c = None
-            xc = None
-            if self.use_positional_encodings:
-                pos_x, pos_y = self.compute_latent_shifts(batch)
-                c = {'pos_x': pos_x, 'pos_y': pos_y}
-        out = [z, c]
-        if return_first_stage_outputs:
-            xrec = self.decode_first_stage(z)
-            out.extend([x, xrec])
-        if return_original_cond:
-            out.append(xc)
-        return out
-
-    @torch.no_grad()
-    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
-        if predict_cids:
-            if z.dim() == 4:
-                z = torch.argmax(z.exp(), dim=1).long()
-            z = self.first_stage_model.quantize.get_codebook_entry(z, shape=None)
-            z = rearrange(z, 'b h w c -> b c h w').contiguous()
-
-        z = 1. / self.scale_factor * z
-
-        if hasattr(self, "split_input_params"):
-            if self.split_input_params["patch_distributed_vq"]:
-                ks = self.split_input_params["ks"]  # eg. (128, 128)
-                stride = self.split_input_params["stride"]  # eg. (64, 64)
-                uf = self.split_input_params["vqf"]
-                bs, nc, h, w = z.shape
-                if ks[0] > h or ks[1] > w:
-                    ks = (min(ks[0], h), min(ks[1], w))
-                    print("reducing Kernel")
-
-                if stride[0] > h or stride[1] > w:
-                    stride = (min(stride[0], h), min(stride[1], w))
-                    print("reducing stride")
-
-                fold, unfold, normalization, weighting = self.get_fold_unfold(z, ks, stride, uf=uf)
-
-                z = unfold(z)  # (bn, nc * prod(**ks), L)
-                # 1. Reshape to img shape
-                z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-
-                # 2. apply model loop over last dim
-                if isinstance(self.first_stage_model, VQModelInterface):
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i],
-                                                                 force_not_quantize=predict_cids or force_not_quantize)
-                                   for i in range(z.shape[-1])]
-                else:
-
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i])
-                                   for i in range(z.shape[-1])]
-
-                o = torch.stack(output_list, axis=-1)  # # (bn, nc, ks[0], ks[1], L)
-                o = o * weighting
-                # Reverse 1. reshape to img shape
-                o = o.view((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
-                # stitch crops together
-                decoded = fold(o)
-                decoded = decoded / normalization  # norm is shape (1, 1, h, w)
-                return decoded
-            else:
-                if isinstance(self.first_stage_model, VQModelInterface):
-                    return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
-                else:
-                    return self.first_stage_model.decode(z)
-
-        else:
-            if isinstance(self.first_stage_model, VQModelInterface):
-                return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
-            else:
-                return self.first_stage_model.decode(z)
-
-    # same as above but without decorator
-    def differentiable_decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
-        if predict_cids:
-            if z.dim() == 4:
-                z = torch.argmax(z.exp(), dim=1).long()
-            z = self.first_stage_model.quantize.get_codebook_entry(z, shape=None)
-            z = rearrange(z, 'b h w c -> b c h w').contiguous()
-
-        z = 1. / self.scale_factor * z
-
-        if hasattr(self, "split_input_params"):
-            if self.split_input_params["patch_distributed_vq"]:
-                ks = self.split_input_params["ks"]  # eg. (128, 128)
-                stride = self.split_input_params["stride"]  # eg. (64, 64)
-                uf = self.split_input_params["vqf"]
-                bs, nc, h, w = z.shape
-                if ks[0] > h or ks[1] > w:
-                    ks = (min(ks[0], h), min(ks[1], w))
-                    print("reducing Kernel")
-
-                if stride[0] > h or stride[1] > w:
-                    stride = (min(stride[0], h), min(stride[1], w))
-                    print("reducing stride")
-
-                fold, unfold, normalization, weighting = self.get_fold_unfold(z, ks, stride, uf=uf)
-
-                z = unfold(z)  # (bn, nc * prod(**ks), L)
-                # 1. Reshape to img shape
-                z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-
-                # 2. apply model loop over last dim
-                if isinstance(self.first_stage_model, VQModelInterface):
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i],
-                                                                 force_not_quantize=predict_cids or force_not_quantize)
-                                   for i in range(z.shape[-1])]
-                else:
-
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i])
-                                   for i in range(z.shape[-1])]
-
-                o = torch.stack(output_list, axis=-1)  # # (bn, nc, ks[0], ks[1], L)
-                o = o * weighting
-                # Reverse 1. reshape to img shape
-                o = o.view((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
-                # stitch crops together
-                decoded = fold(o)
-                decoded = decoded / normalization  # norm is shape (1, 1, h, w)
-                return decoded
-            else:
-                if isinstance(self.first_stage_model, VQModelInterface):
-                    return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
-                else:
-                    return self.first_stage_model.decode(z)
-
-        else:
-            if isinstance(self.first_stage_model, VQModelInterface):
-                return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
-            else:
-                return self.first_stage_model.decode(z)
-
-    @torch.no_grad()
-    def encode_first_stage(self, x):
-        if hasattr(self, "split_input_params"):
-            if self.split_input_params["patch_distributed_vq"]:
-                ks = self.split_input_params["ks"]  # eg. (128, 128)
-                stride = self.split_input_params["stride"]  # eg. (64, 64)
-                df = self.split_input_params["vqf"]
-                self.split_input_params['original_image_size'] = x.shape[-2:]
-                bs, nc, h, w = x.shape
-                if ks[0] > h or ks[1] > w:
-                    ks = (min(ks[0], h), min(ks[1], w))
-                    print("reducing Kernel")
-
-                if stride[0] > h or stride[1] > w:
-                    stride = (min(stride[0], h), min(stride[1], w))
-                    print("reducing stride")
-
-                fold, unfold, normalization, weighting = self.get_fold_unfold(x, ks, stride, df=df)
-                z = unfold(x)  # (bn, nc * prod(**ks), L)
-                # Reshape to img shape
-                z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-
-                output_list = [self.first_stage_model.encode(z[:, :, :, :, i])
-                               for i in range(z.shape[-1])]
-
-                o = torch.stack(output_list, axis=-1)
-                o = o * weighting
-
-                # Reverse reshape to img shape
-                o = o.view((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
-                # stitch crops together
-                decoded = fold(o)
-                decoded = decoded / normalization
-                return decoded
-
-            else:
-                return self.first_stage_model.encode(x)
-        else:
-            return self.first_stage_model.encode(x)
-
-    def shared_step(self, batch, **kwargs):
-        x, c = self.get_input(batch, self.first_stage_key)
-        loss = self(x, c)
-        return loss
-
-    def forward(self, x, c, *args, **kwargs):
-        t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
-        if self.model.conditioning_key is not None:
-            assert c is not None
-            if self.cond_stage_trainable:
-                c = self.get_learned_conditioning(c)
-            if self.shorten_cond_schedule:  # TODO: drop this option
-                tc = self.cond_ids[t].to(self.device)
-                c = self.q_sample(x_start=c, t=tc, noise=torch.randn_like(c.float()))
-        return self.p_losses(x, c, t, *args, **kwargs)
-
-    def apply_model(self, x_noisy, t, cond, return_ids=False):
-
-        if isinstance(cond, dict):
-            # hybrid case, cond is exptected to be a dict
-            pass
-        else:
-            if not isinstance(cond, list):
-                cond = [cond]
-            key = 'c_concat' if self.model.conditioning_key == 'concat' else 'c_crossattn'
-            cond = {key: cond}
-
-        if hasattr(self, "split_input_params"):
-            assert len(cond) == 1  # todo can only deal with one conditioning atm
-            assert not return_ids
-            ks = self.split_input_params["ks"]  # eg. (128, 128)
-            stride = self.split_input_params["stride"]  # eg. (64, 64)
-
-            h, w = x_noisy.shape[-2:]
-
-            fold, unfold, normalization, weighting = self.get_fold_unfold(x_noisy, ks, stride)
-
-            z = unfold(x_noisy)  # (bn, nc * prod(**ks), L)
-            # Reshape to img shape
-            z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-            z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
-
-            if self.cond_stage_key in ["image", "LR_image", "segmentation",
-                                       'bbox_img'] and self.model.conditioning_key:  # todo check for completeness
-                c_key = next(iter(cond.keys()))  # get key
-                c = next(iter(cond.values()))  # get value
-                assert (len(c) == 1)  # todo extend to list with more than one elem
-                c = c[0]  # get element
-
-                c = unfold(c)
-                c = c.view((c.shape[0], -1, ks[0], ks[1], c.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-
-                cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])]
-
-            elif self.cond_stage_key == 'coordinates_bbox':
-                assert 'original_image_size' in self.split_input_params, 'BoudingBoxRescaling is missing original_image_size'
-
-                # assuming padding of unfold is always 0 and its dilation is always 1
-                n_patches_per_row = int((w - ks[0]) / stride[0] + 1)
-                full_img_h, full_img_w = self.split_input_params['original_image_size']
-                # as we are operating on latents, we need the factor from the original image size to the
-                # spatial latent size to properly rescale the crops for regenerating the bbox annotations
-                num_downs = self.first_stage_model.encoder.num_resolutions - 1
-                rescale_latent = 2 ** (num_downs)
-
-                # get top left postions of patches as conforming for the bbbox tokenizer, therefore we
-                # need to rescale the tl patch coordinates to be in between (0,1)
-                tl_patch_coordinates = [(rescale_latent * stride[0] * (patch_nr % n_patches_per_row) / full_img_w,
-                                         rescale_latent * stride[1] * (patch_nr // n_patches_per_row) / full_img_h)
-                                        for patch_nr in range(z.shape[-1])]
-
-                # patch_limits are tl_coord, width and height coordinates as (x_tl, y_tl, h, w)
-                patch_limits = [(x_tl, y_tl,
-                                 rescale_latent * ks[0] / full_img_w,
-                                 rescale_latent * ks[1] / full_img_h) for x_tl, y_tl in tl_patch_coordinates]
-                # patch_values = [(np.arange(x_tl,min(x_tl+ks, 1.)),np.arange(y_tl,min(y_tl+ks, 1.))) for x_tl, y_tl in tl_patch_coordinates]
-
-                # tokenize crop coordinates for the bounding boxes of the respective patches
-                patch_limits_tknzd = [torch.LongTensor(self.bbox_tokenizer._crop_encoder(bbox))[None].to(self.device)
-                                      for bbox in patch_limits]  # list of length l with tensors of shape (1, 2)
-                print(patch_limits_tknzd[0].shape)
-                # cut tknzd crop position from conditioning
-                assert isinstance(cond, dict), 'cond must be dict to be fed into model'
-                cut_cond = cond['c_crossattn'][0][..., :-2].to(self.device)
-                print(cut_cond.shape)
-
-                adapted_cond = torch.stack([torch.cat([cut_cond, p], dim=1) for p in patch_limits_tknzd])
-                adapted_cond = rearrange(adapted_cond, 'l b n -> (l b) n')
-                print(adapted_cond.shape)
-                adapted_cond = self.get_learned_conditioning(adapted_cond)
-                print(adapted_cond.shape)
-                adapted_cond = rearrange(adapted_cond, '(l b) n d -> l b n d', l=z.shape[-1])
-                print(adapted_cond.shape)
-
-                cond_list = [{'c_crossattn': [e]} for e in adapted_cond]
-
-            else:
-                cond_list = [cond for i in range(z.shape[-1])]  # Todo make this more efficient
-
-            # apply model by loop over crops
-            output_list = [self.model(z_list[i], t, **cond_list[i]) for i in range(z.shape[-1])]
-            assert not isinstance(output_list[0],
-                                  tuple)  # todo cant deal with multiple model outputs check this never happens
-
-            o = torch.stack(output_list, axis=-1)
-            o = o * weighting
-            # Reverse reshape to img shape
-            o = o.view((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
-            # stitch crops together
-            x_recon = fold(o) / normalization
-
-        else:
-            x_recon = self.model(x_noisy, t, **cond)
-
-        if isinstance(x_recon, tuple) and not return_ids:
-            return x_recon[0]
-        else:
-            return x_recon
-
-    def _predict_eps_from_xstart(self, x_t, t, pred_xstart):
-        return (extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t - pred_xstart) / \
-               extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
-
-    def _prior_bpd(self, x_start):
-        """
-        Get the prior KL term for the variational lower-bound, measured in
-        bits-per-dim.
-        This term can't be optimized, as it only depends on the encoder.
-        :param x_start: the [N x C x ...] tensor of inputs.
-        :return: a batch of [N] KL values (in bits), one per batch element.
-        """
-        batch_size = x_start.shape[0]
-        t = torch.tensor([self.num_timesteps - 1] * batch_size, device=x_start.device)
-        qt_mean, _, qt_log_variance = self.q_mean_variance(x_start, t)
-        kl_prior = normal_kl(mean1=qt_mean, logvar1=qt_log_variance, mean2=0.0, logvar2=0.0)
-        return mean_flat(kl_prior) / np.log(2.0)
-
-    def p_losses(self, x_start, cond, t, noise=None):
-        noise = default(noise, lambda: torch.randn_like(x_start))
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        model_output = self.apply_model(x_noisy, t, cond)
-
-        loss_dict = {}
-        prefix = 'train' if self.training else 'val'
-
-        if self.parameterization == "x0":
-            target = x_start
-        elif self.parameterization == "eps":
-            target = noise
-        else:
-            raise NotImplementedError()
-
-        loss_simple = self.get_loss(model_output, target, mean=False).mean([1, 2, 3])
-        loss_dict.update({f'{prefix}/loss_simple': loss_simple.mean()})
-
-        logvar_t = self.logvar[t].to(self.device)
-        loss = loss_simple / torch.exp(logvar_t) + logvar_t
-        # loss = loss_simple / torch.exp(self.logvar) + self.logvar
-        if self.learn_logvar:
-            loss_dict.update({f'{prefix}/loss_gamma': loss.mean()})
-            loss_dict.update({'logvar': self.logvar.data.mean()})
-
-        loss = self.l_simple_weight * loss.mean()
-
-        loss_vlb = self.get_loss(model_output, target, mean=False).mean(dim=(1, 2, 3))
-        loss_vlb = (self.lvlb_weights[t] * loss_vlb).mean()
-        loss_dict.update({f'{prefix}/loss_vlb': loss_vlb})
-        loss += (self.original_elbo_weight * loss_vlb)
-        loss_dict.update({f'{prefix}/loss': loss})
-
-        return loss, loss_dict
-
-    def p_mean_variance(self, x, c, t, clip_denoised: bool, return_codebook_ids=False, quantize_denoised=False,
-                        return_x0=False, score_corrector=None, corrector_kwargs=None):
-        t_in = t
-        model_out = self.apply_model(x, t_in, c, return_ids=return_codebook_ids)
-
-        if score_corrector is not None:
-            assert self.parameterization == "eps"
-            model_out = score_corrector.modify_score(self, model_out, x, t, c, **corrector_kwargs)
-
-        if return_codebook_ids:
-            model_out, logits = model_out
-
-        if self.parameterization == "eps":
-            x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
-        elif self.parameterization == "x0":
-            x_recon = model_out
-        else:
-            raise NotImplementedError()
-
-        if clip_denoised:
-            x_recon.clamp_(-1., 1.)
-        if quantize_denoised:
-            x_recon, _, [_, _, indices] = self.first_stage_model.quantize(x_recon)
-        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
-        if return_codebook_ids:
-            return model_mean, posterior_variance, posterior_log_variance, logits
-        elif return_x0:
-            return model_mean, posterior_variance, posterior_log_variance, x_recon
-        else:
-            return model_mean, posterior_variance, posterior_log_variance
-
-    @torch.no_grad()
-    def p_sample(self, x, c, t, clip_denoised=False, repeat_noise=False,
-                 return_codebook_ids=False, quantize_denoised=False, return_x0=False,
-                 temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None):
-        b, *_, device = *x.shape, x.device
-        outputs = self.p_mean_variance(x=x, c=c, t=t, clip_denoised=clip_denoised,
-                                       return_codebook_ids=return_codebook_ids,
-                                       quantize_denoised=quantize_denoised,
-                                       return_x0=return_x0,
-                                       score_corrector=score_corrector, corrector_kwargs=corrector_kwargs)
-        if return_codebook_ids:
-            raise DeprecationWarning("Support dropped.")
-            model_mean, _, model_log_variance, logits = outputs
-        elif return_x0:
-            model_mean, _, model_log_variance, x0 = outputs
-        else:
-            model_mean, _, model_log_variance = outputs
-
-        noise = noise_like(x.shape, device, repeat_noise) * temperature
-        if noise_dropout > 0.:
-            noise = torch.nn.functional.dropout(noise, p=noise_dropout)
-        # no noise when t == 0
-        nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
-
-        if return_codebook_ids:
-            return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise, logits.argmax(dim=1)
-        if return_x0:
-            return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise, x0
-        else:
-            return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
-
-    @torch.no_grad()
-    def progressive_denoising(self, cond, shape, verbose=True, callback=None, quantize_denoised=False,
-                              img_callback=None, mask=None, x0=None, temperature=1., noise_dropout=0.,
-                              score_corrector=None, corrector_kwargs=None, batch_size=None, x_T=None, start_T=None,
-                              log_every_t=None):
-        if not log_every_t:
-            log_every_t = self.log_every_t
-        timesteps = self.num_timesteps
-        if batch_size is not None:
-            b = batch_size if batch_size is not None else shape[0]
-            shape = [batch_size] + list(shape)
-        else:
-            b = batch_size = shape[0]
-        if x_T is None:
-            img = torch.randn(shape, device=self.device)
-        else:
-            img = x_T
-        intermediates = []
-        if cond is not None:
-            if isinstance(cond, dict):
-                cond = {key: cond[key][:batch_size] if not isinstance(cond[key], list) else
-                [x[:batch_size] for x in cond[key]] for key in cond}
-            else:
-                cond = [c[:batch_size] for c in cond] if isinstance(cond, list) else cond[:batch_size]
-
-        if start_T is not None:
-            timesteps = min(timesteps, start_T)
-        iterator = tqdm(reversed(range(0, timesteps)), desc='Progressive Generation',
-                        total=timesteps) if verbose else reversed(
-            range(0, timesteps))
-        if type(temperature) == float:
-            temperature = [temperature] * timesteps
-
-        for i in iterator:
-            ts = torch.full((b,), i, device=self.device, dtype=torch.long)
-            if self.shorten_cond_schedule:
-                assert self.model.conditioning_key != 'hybrid'
-                tc = self.cond_ids[ts].to(cond.device)
-                cond = self.q_sample(x_start=cond, t=tc, noise=torch.randn_like(cond))
-
-            img, x0_partial = self.p_sample(img, cond, ts,
-                                            clip_denoised=self.clip_denoised,
-                                            quantize_denoised=quantize_denoised, return_x0=True,
-                                            temperature=temperature[i], noise_dropout=noise_dropout,
-                                            score_corrector=score_corrector, corrector_kwargs=corrector_kwargs)
-            if mask is not None:
-                assert x0 is not None
-                img_orig = self.q_sample(x0, ts)
-                img = img_orig * mask + (1. - mask) * img
-
-            if i % log_every_t == 0 or i == timesteps - 1:
-                intermediates.append(x0_partial)
-            if callback:
-                callback(i)
-            if img_callback:
-                img_callback(img, i)
-        return img, intermediates
-
-    @torch.no_grad()
-    def p_sample_loop(self, cond, shape, return_intermediates=False,
-                      x_T=None, verbose=True, callback=None, timesteps=None, quantize_denoised=False,
-                      mask=None, x0=None, img_callback=None, start_T=None,
-                      log_every_t=None):
-
-        if not log_every_t:
-            log_every_t = self.log_every_t
-        device = self.betas.device
-        b = shape[0]
-        if x_T is None:
-            img = torch.randn(shape, device=device)
-        else:
-            img = x_T
-
-        intermediates = [img]
-        if timesteps is None:
-            timesteps = self.num_timesteps
-
-        if start_T is not None:
-            timesteps = min(timesteps, start_T)
-        iterator = tqdm(reversed(range(0, timesteps)), desc='Sampling t', total=timesteps) if verbose else reversed(
-            range(0, timesteps))
-
-        if mask is not None:
-            assert x0 is not None
-            assert x0.shape[2:3] == mask.shape[2:3]  # spatial size has to match
-
-        for i in iterator:
-            ts = torch.full((b,), i, device=device, dtype=torch.long)
-            if self.shorten_cond_schedule:
-                assert self.model.conditioning_key != 'hybrid'
-                tc = self.cond_ids[ts].to(cond.device)
-                cond = self.q_sample(x_start=cond, t=tc, noise=torch.randn_like(cond))
-
-            img = self.p_sample(img, cond, ts,
-                                clip_denoised=self.clip_denoised,
-                                quantize_denoised=quantize_denoised)
-            if mask is not None:
-                img_orig = self.q_sample(x0, ts)
-                img = img_orig * mask + (1. - mask) * img
-
-            if i % log_every_t == 0 or i == timesteps - 1:
-                intermediates.append(img)
-            if callback:
-                callback(i)
-            if img_callback:
-                img_callback(img, i)
-
-        if return_intermediates:
-            return img, intermediates
-        return img
-
-    @torch.no_grad()
-    def sample(self, cond, batch_size=16, return_intermediates=False, x_T=None,
-               verbose=True, timesteps=None, quantize_denoised=False,
-               mask=None, x0=None, shape=None,**kwargs):
-        if shape is None:
-            shape = (batch_size, self.channels, self.image_size, self.image_size)
-        if cond is not None:
-            if isinstance(cond, dict):
-                cond = {key: cond[key][:batch_size] if not isinstance(cond[key], list) else
-                [x[:batch_size] for x in cond[key]] for key in cond}
-            else:
-                cond = [c[:batch_size] for c in cond] if isinstance(cond, list) else cond[:batch_size]
-        return self.p_sample_loop(cond,
-                                  shape,
-                                  return_intermediates=return_intermediates, x_T=x_T,
-                                  verbose=verbose, timesteps=timesteps, quantize_denoised=quantize_denoised,
-                                  mask=mask, x0=x0)
-
-    @torch.no_grad()
-    def sample_log(self,cond,batch_size,ddim, ddim_steps,**kwargs):
-
-        if ddim:
-            ddim_sampler = DDIMSampler(self)
-            shape = (self.channels, self.image_size, self.image_size)
-            samples, intermediates =ddim_sampler.sample(ddim_steps,batch_size,
-                                                        shape,cond,verbose=False,**kwargs)
-
-        else:
-            samples, intermediates = self.sample(cond=cond, batch_size=batch_size,
-                                                 return_intermediates=True,**kwargs)
-
-        return samples, intermediates
-
-
-    @torch.no_grad()
-    def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None,
-                   quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
-                   plot_diffusion_rows=True, **kwargs):
-
-        use_ddim = ddim_steps is not None
-
-        log = {}
-        z, c, x, xrec, xc = self.get_input(batch, self.first_stage_key,
-                                           return_first_stage_outputs=True,
-                                           force_c_encode=True,
-                                           return_original_cond=True,
-                                           bs=N)
-        N = min(x.shape[0], N)
-        n_row = min(x.shape[0], n_row)
-        log["inputs"] = x
-        log["reconstruction"] = xrec
-        if self.model.conditioning_key is not None:
-            if hasattr(self.cond_stage_model, "decode"):
-                xc = self.cond_stage_model.decode(c)
-                log["conditioning"] = xc
-            elif self.cond_stage_key in ["caption"]:
-                xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
-                log["conditioning"] = xc
-            elif self.cond_stage_key == 'class_label':
-                xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["human_label"])
-                log['conditioning'] = xc
-            elif isimage(xc):
-                log["conditioning"] = xc
-            if ismap(xc):
-                log["original_conditioning"] = self.to_rgb(xc)
-
-        if plot_diffusion_rows:
-            # get diffusion row
-            diffusion_row = []
-            z_start = z[:n_row]
-            for t in range(self.num_timesteps):
-                if t % self.log_every_t == 0 or t == self.num_timesteps - 1:
-                    t = repeat(torch.tensor([t]), '1 -> b', b=n_row)
-                    t = t.to(self.device).long()
-                    noise = torch.randn_like(z_start)
-                    z_noisy = self.q_sample(x_start=z_start, t=t, noise=noise)
-                    diffusion_row.append(self.decode_first_stage(z_noisy))
-
-            diffusion_row = torch.stack(diffusion_row)  # n_log_step, n_row, C, H, W
-            diffusion_grid = rearrange(diffusion_row, 'n b c h w -> b n c h w')
-            diffusion_grid = rearrange(diffusion_grid, 'b n c h w -> (b n) c h w')
-            diffusion_grid = make_grid(diffusion_grid, nrow=diffusion_row.shape[0])
-            log["diffusion_row"] = diffusion_grid
-
-        if sample:
-            # get denoise row
-            with self.ema_scope("Plotting"):
-                samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,
-                                                         ddim_steps=ddim_steps,eta=ddim_eta)
-                # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True)
-            x_samples = self.decode_first_stage(samples)
-            log["samples"] = x_samples
-            if plot_denoise_rows:
-                denoise_grid = self._get_denoise_row_from_list(z_denoise_row)
-                log["denoise_row"] = denoise_grid
-
-            if quantize_denoised and not isinstance(self.first_stage_model, AutoencoderKL) and not isinstance(
-                    self.first_stage_model, IdentityFirstStage):
-                # also display when quantizing x0 while sampling
-                with self.ema_scope("Plotting Quantized Denoised"):
-                    samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,
-                                                             ddim_steps=ddim_steps,eta=ddim_eta,
-                                                             quantize_denoised=True)
-                    # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True,
-                    #                                      quantize_denoised=True)
-                x_samples = self.decode_first_stage(samples.to(self.device))
-                log["samples_x0_quantized"] = x_samples
-
-            if inpaint:
-                # make a simple center square
-                h, w = z.shape[2], z.shape[3]
-                mask = torch.ones(N, h, w).to(self.device)
-                # zeros will be filled in
-                mask[:, h // 4:3 * h // 4, w // 4:3 * w // 4] = 0.
-                mask = mask[:, None, ...]
-                with self.ema_scope("Plotting Inpaint"):
-
-                    samples, _ = self.sample_log(cond=c,batch_size=N,ddim=use_ddim, eta=ddim_eta,
-                                                ddim_steps=ddim_steps, x0=z[:N], mask=mask)
-                x_samples = self.decode_first_stage(samples.to(self.device))
-                log["samples_inpainting"] = x_samples
-                log["mask"] = mask
-
-                # outpaint
-                with self.ema_scope("Plotting Outpaint"):
-                    samples, _ = self.sample_log(cond=c, batch_size=N, ddim=use_ddim,eta=ddim_eta,
-                                                ddim_steps=ddim_steps, x0=z[:N], mask=mask)
-                x_samples = self.decode_first_stage(samples.to(self.device))
-                log["samples_outpainting"] = x_samples
-
-        if plot_progressive_rows:
-            with self.ema_scope("Plotting Progressives"):
-                img, progressives = self.progressive_denoising(c,
-                                                               shape=(self.channels, self.image_size, self.image_size),
-                                                               batch_size=N)
-            prog_row = self._get_denoise_row_from_list(progressives, desc="Progressive Generation")
-            log["progressive_row"] = prog_row
-
-        if return_keys:
-            if np.intersect1d(list(log.keys()), return_keys).shape[0] == 0:
-                return log
-            else:
-                return {key: log[key] for key in return_keys}
-        return log
-
-    def configure_optimizers(self):
-        lr = self.learning_rate
-        params = list(self.model.parameters())
-        if self.cond_stage_trainable:
-            print(f"{self.__class__.__name__}: Also optimizing conditioner params!")
-            params = params + list(self.cond_stage_model.parameters())
-        if self.learn_logvar:
-            print('Diffusion model optimizing logvar')
-            params.append(self.logvar)
-        opt = torch.optim.AdamW(params, lr=lr)
-        if self.use_scheduler:
-            assert 'target' in self.scheduler_config
-            scheduler = instantiate_from_config(self.scheduler_config)
-
-            print("Setting up LambdaLR scheduler...")
-            scheduler = [
-                {
-                    'scheduler': LambdaLR(opt, lr_lambda=scheduler.schedule),
-                    'interval': 'step',
-                    'frequency': 1
-                }]
-            return [opt], scheduler
-        return opt
-
-    @torch.no_grad()
-    def to_rgb(self, x):
-        x = x.float()
-        if not hasattr(self, "colorize"):
-            self.colorize = torch.randn(3, x.shape[1], 1, 1).to(x)
-        x = nn.functional.conv2d(x, weight=self.colorize)
-        x = 2. * (x - x.min()) / (x.max() - x.min()) - 1.
-        return x
-
-
+	'main class'
+	def __init__(A,first_stage_config,cond_stage_config,num_timesteps_cond=_A,cond_stage_key=_Q,cond_stage_trainable=_B,concat_mode=_C,cond_stage_forward=_A,conditioning_key=_A,scale_factor=_D,scale_by_std=_B,*J,**C):
+		H=scale_by_std;G=scale_factor;F=concat_mode;E=cond_stage_config;D=first_stage_config;B=conditioning_key;A.num_timesteps_cond=default(num_timesteps_cond,1);A.scale_by_std=H;assert A.num_timesteps_cond<=C['timesteps']
+		if B is _A:B=_H if F else _I
+		if E==_V:B=_A
+		I=C.pop('ckpt_path',_A);K=C.pop('ignore_keys',[]);super().__init__(*J,conditioning_key=B,**C);A.concat_mode=F;A.cond_stage_trainable=cond_stage_trainable;A.cond_stage_key=cond_stage_key
+		try:A.num_downs=len(D.params.ddconfig.ch_mult)-1
+		except Exception:A.num_downs=0
+		if not H:A.scale_factor=G
+		else:A.register_buffer(_l,torch.tensor(G))
+		A.instantiate_first_stage(D);A.instantiate_cond_stage(E);A.cond_stage_forward=cond_stage_forward;A.clip_denoised=_B;A.bbox_tokenizer=_A;A.restarted_from_ckpt=_B
+		if I is not _A:A.init_from_ckpt(I,K);A.restarted_from_ckpt=_C
+	def make_cond_schedule(A):A.cond_ids=torch.full(size=(A.num_timesteps,),fill_value=A.num_timesteps-1,dtype=torch.long);B=torch.round(torch.linspace(0,A.num_timesteps-1,A.num_timesteps_cond)).long();A.cond_ids[:A.num_timesteps_cond]=B
+	@rank_zero_only
+	@torch.no_grad()
+	def on_train_batch_start(self,batch,batch_idx,dataloader_idx):
+		C='### USING STD-RESCALING ###';A=self
+		if A.scale_by_std and A.current_epoch==0 and A.global_step==0 and batch_idx==0 and not A.restarted_from_ckpt:assert A.scale_factor==_D,'rather not use custom rescaling and std-rescaling simultaneously';print(C);B=super().get_input(batch,A.first_stage_key);B=B.to(A.device);D=A.encode_first_stage(B);E=A.get_first_stage_encoding(D).detach();del A.scale_factor;A.register_buffer(_l,_D/E.flatten().std());print(f"setting self.scale_factor to {A.scale_factor}");print(C)
+	def register_schedule(A,given_betas=_A,beta_schedule=_P,timesteps=1000,linear_start=.0001,linear_end=.02,cosine_s=.008):
+		super().register_schedule(given_betas,beta_schedule,timesteps,linear_start,linear_end,cosine_s);A.shorten_cond_schedule=A.num_timesteps_cond>1
+		if A.shorten_cond_schedule:A.make_cond_schedule()
+	def instantiate_first_stage(A,config):
+		B=instantiate_from_config(config);A.first_stage_model=B.eval();A.first_stage_model.train=disabled_train
+		for C in A.first_stage_model.parameters():C.requires_grad=_B
+	def instantiate_cond_stage(A,config):
+		D='__is_first_stage__';B=config
+		if not A.cond_stage_trainable:
+			if B==D:print('Using first stage also as cond stage.');A.cond_stage_model=A.first_stage_model
+			elif B==_V:print(f"Training {A.__class__.__name__} as an unconditional model.");A.cond_stage_model=_A
+			else:
+				C=instantiate_from_config(B);A.cond_stage_model=C.eval();A.cond_stage_model.train=disabled_train
+				for E in A.cond_stage_model.parameters():E.requires_grad=_B
+		else:assert B!=D;assert B!=_V;C=instantiate_from_config(B);A.cond_stage_model=C
+	def _get_denoise_row_from_list(C,samples,desc='',force_no_decoder_quantization=_B):
+		A=[]
+		for D in tqdm(samples,desc=desc):A.append(C.decode_first_stage(D.to(C.device),force_not_quantize=force_no_decoder_quantization))
+		E=len(A);A=torch.stack(A);B=rearrange(A,_T);B=rearrange(B,_U);B=make_grid(B,nrow=E);return B
+	def get_first_stage_encoding(C,encoder_posterior):
+		A=encoder_posterior
+		if isinstance(A,DiagonalGaussianDistribution):B=A.sample()
+		elif isinstance(A,torch.Tensor):B=A
+		else:raise NotImplementedError(f"encoder_posterior of type '{type(A)}' not yet implemented")
+		return C.scale_factor*B
+	def get_learned_conditioning(A,c):
+		if A.cond_stage_forward is _A:
+			if hasattr(A.cond_stage_model,'encode')and callable(A.cond_stage_model.encode):
+				c=A.cond_stage_model.encode(c)
+				if isinstance(c,DiagonalGaussianDistribution):c=c.mode()
+			else:c=A.cond_stage_model(c)
+		else:assert hasattr(A.cond_stage_model,A.cond_stage_forward);c=getattr(A.cond_stage_model,A.cond_stage_forward)(c)
+		return c
+	def meshgrid(D,h,w):A=torch.arange(0,h).view(h,1,1).repeat(1,w,1);B=torch.arange(0,w).view(1,w,1).repeat(h,1,1);C=torch.cat([A,B],dim=-1);return C
+	def delta_border(B,h,w):'\n        :param h: height\n        :param w: width\n        :return: normalized distance to image border,\n         wtith min distance = 0 at border and max dist = 0.5 at image center\n        ';C=torch.tensor([h-1,w-1]).view(1,1,2);A=B.meshgrid(h,w)/C;D=torch.min(A,dim=-1,keepdims=_C)[0];E=torch.min(1-A,dim=-1,keepdims=_C)[0];F=torch.min(torch.cat([D,E],dim=-1),dim=-1)[0];return F
+	def get_weighting(A,h,w,Ly,Lx,device):
+		D=device;B=A.delta_border(h,w);B=torch.clip(B,A.split_input_params['clip_min_weight'],A.split_input_params['clip_max_weight']);B=B.view(1,h*w,1).repeat(1,1,Ly*Lx).to(D)
+		if A.split_input_params['tie_braker']:C=A.delta_border(Ly,Lx);C=torch.clip(C,A.split_input_params['clip_min_tie_weight'],A.split_input_params['clip_max_tie_weight']);C=C.view(1,1,Ly*Lx).to(D);B=B*C
+		return B
+	def get_fold_unfold(L,x,kernel_size,stride,uf=1,df=1):
+		'\n        :param x: img of size (bs, c, h, w)\n        :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])\n        ';E=stride;C=df;B=uf;A=kernel_size;P,Q,J,K=x.shape;F=(J-A[0])//E[0]+1;G=(K-A[1])//E[1]+1
+		if B==1 and C==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);I=torch.nn.Fold(output_size=x.shape[2:],**H);D=L.get_weighting(A[0],A[1],F,G,x.device).to(x.dtype);N=I(D).view(1,1,J,K);D=D.view((1,1,A[0],A[1],F*G))
+		elif B>1 and C==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]*B,A[0]*B),dilation=1,padding=0,stride=(E[0]*B,E[1]*B));I=torch.nn.Fold(output_size=(x.shape[2]*B,x.shape[3]*B),**O);D=L.get_weighting(A[0]*B,A[1]*B,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J*B,K*B);D=D.view((1,1,A[0]*B,A[1]*B,F*G))
+		elif C>1 and B==1:H=dict(kernel_size=A,dilation=1,padding=0,stride=E);M=torch.nn.Unfold(**H);O=dict(kernel_size=(A[0]//C,A[0]//C),dilation=1,padding=0,stride=(E[0]//C,E[1]//C));I=torch.nn.Fold(output_size=(x.shape[2]//C,x.shape[3]//C),**O);D=L.get_weighting(A[0]//C,A[1]//C,F,G,x.device).to(x.dtype);N=I(D).view(1,1,J//C,K//C);D=D.view((1,1,A[0]//C,A[1]//C,F*G))
+		else:raise NotImplementedError
+		return I,M,N,D
+	@torch.no_grad()
+	def get_input(self,batch,k,return_first_stage_outputs=_B,force_c_encode=_B,cond_key=_A,return_original_cond=_B,bs=_A):
+		L='pos_y';K='pos_x';F=batch;D=cond_key;A=self;E=super().get_input(F,k)
+		if bs is not _A:E=E[:bs]
+		E=E.to(A.device);M=A.encode_first_stage(E);J=A.get_first_stage_encoding(M).detach()
+		if A.model.conditioning_key is not _A:
+			if D is _A:D=A.cond_stage_key
+			if D!=A.first_stage_key:
+				if D in[_W,_X]:B=F[D]
+				elif D==_m:B=F
+				else:B=super().get_input(F,D).to(A.device)
+			else:B=E
+			if not A.cond_stage_trainable or force_c_encode:
+				if isinstance(B,dict)or isinstance(B,list):C=A.get_learned_conditioning(B)
+				else:C=A.get_learned_conditioning(B.to(A.device))
+			else:C=B
+			if bs is not _A:C=C[:bs]
+			if A.use_positional_encodings:G,H=A.compute_latent_shifts(F);N=__conditioning_keys__[A.model.conditioning_key];C={N:C,K:G,L:H}
+		else:
+			C=_A;B=_A
+			if A.use_positional_encodings:G,H=A.compute_latent_shifts(F);C={K:G,L:H}
+		I=[J,C]
+		if return_first_stage_outputs:O=A.decode_first_stage(J);I.extend([E,O])
+		if return_original_cond:I.append(B)
+		return I
+	@torch.no_grad()
+	def decode_first_stage(self,z,predict_cids=_B,force_not_quantize=_B):
+		H=force_not_quantize;E=predict_cids;A=self
+		if E:
+			if z.dim()==4:z=torch.argmax(z.exp(),dim=1).long()
+			z=A.first_stage_model.quantize.get_codebook_entry(z,shape=_A);z=rearrange(z,_S).contiguous()
+		z=_D/A.scale_factor*z
+		if hasattr(A,_K):
+			if A.split_input_params[_Y]:
+				B=A.split_input_params[_L];D=A.split_input_params[_M];K=A.split_input_params[_Z];P,Q,F,G=z.shape
+				if B[0]>F or B[1]>G:B=min(B[0],F),min(B[1],G);print(_a)
+				if D[0]>F or D[1]>G:D=min(D[0],F),min(D[1],G);print(_b)
+				L,M,N,O=A.get_fold_unfold(z,B,D,uf=K);z=M(z);z=z.view((z.shape[0],-1,B[0],B[1],z.shape[-1]))
+				if isinstance(A.first_stage_model,VQModelInterface):J=[A.first_stage_model.decode(z[:,:,:,:,B],force_not_quantize=E or H)for B in range(z.shape[-1])]
+				else:J=[A.first_stage_model.decode(z[:,:,:,:,B])for B in range(z.shape[-1])]
+				C=torch.stack(J,axis=-1);C=C*O;C=C.view((C.shape[0],-1,C.shape[-1]));I=L(C);I=I/N;return I
+			elif isinstance(A.first_stage_model,VQModelInterface):return A.first_stage_model.decode(z,force_not_quantize=E or H)
+			else:return A.first_stage_model.decode(z)
+		elif isinstance(A.first_stage_model,VQModelInterface):return A.first_stage_model.decode(z,force_not_quantize=E or H)
+		else:return A.first_stage_model.decode(z)
+	def differentiable_decode_first_stage(A,z,predict_cids=_B,force_not_quantize=_B):
+		H=force_not_quantize;E=predict_cids
+		if E:
+			if z.dim()==4:z=torch.argmax(z.exp(),dim=1).long()
+			z=A.first_stage_model.quantize.get_codebook_entry(z,shape=_A);z=rearrange(z,_S).contiguous()
+		z=_D/A.scale_factor*z
+		if hasattr(A,_K):
+			if A.split_input_params[_Y]:
+				B=A.split_input_params[_L];D=A.split_input_params[_M];K=A.split_input_params[_Z];P,Q,F,G=z.shape
+				if B[0]>F or B[1]>G:B=min(B[0],F),min(B[1],G);print(_a)
+				if D[0]>F or D[1]>G:D=min(D[0],F),min(D[1],G);print(_b)
+				L,M,N,O=A.get_fold_unfold(z,B,D,uf=K);z=M(z);z=z.view((z.shape[0],-1,B[0],B[1],z.shape[-1]))
+				if isinstance(A.first_stage_model,VQModelInterface):J=[A.first_stage_model.decode(z[:,:,:,:,B],force_not_quantize=E or H)for B in range(z.shape[-1])]
+				else:J=[A.first_stage_model.decode(z[:,:,:,:,B])for B in range(z.shape[-1])]
+				C=torch.stack(J,axis=-1);C=C*O;C=C.view((C.shape[0],-1,C.shape[-1]));I=L(C);I=I/N;return I
+			elif isinstance(A.first_stage_model,VQModelInterface):return A.first_stage_model.decode(z,force_not_quantize=E or H)
+			else:return A.first_stage_model.decode(z)
+		elif isinstance(A.first_stage_model,VQModelInterface):return A.first_stage_model.decode(z,force_not_quantize=E or H)
+		else:return A.first_stage_model.decode(z)
+	@torch.no_grad()
+	def encode_first_stage(self,x):
+		A=self
+		if hasattr(A,_K):
+			if A.split_input_params[_Y]:
+				B=A.split_input_params[_L];D=A.split_input_params[_M];I=A.split_input_params[_Z];A.split_input_params[_c]=x.shape[-2:];O,P,F,G=x.shape
+				if B[0]>F or B[1]>G:B=min(B[0],F),min(B[1],G);print(_a)
+				if D[0]>F or D[1]>G:D=min(D[0],F),min(D[1],G);print(_b)
+				J,K,L,M=A.get_fold_unfold(x,B,D,df=I);E=K(x);E=E.view((E.shape[0],-1,B[0],B[1],E.shape[-1]));N=[A.first_stage_model.encode(E[:,:,:,:,B])for B in range(E.shape[-1])];C=torch.stack(N,axis=-1);C=C*M;C=C.view((C.shape[0],-1,C.shape[-1]));H=J(C);H=H/L;return H
+			else:return A.first_stage_model.encode(x)
+		else:return A.first_stage_model.encode(x)
+	def shared_step(A,batch,**E):B,C=A.get_input(batch,A.first_stage_key);D=A(B,C);return D
+	def forward(A,x,c,*C,**D):
+		B=torch.randint(0,A.num_timesteps,(x.shape[0],),device=A.device).long()
+		if A.model.conditioning_key is not _A:
+			assert c is not _A
+			if A.cond_stage_trainable:c=A.get_learned_conditioning(c)
+			if A.shorten_cond_schedule:E=A.cond_ids[B].to(A.device);c=A.q_sample(x_start=c,t=E,noise=torch.randn_like(c.float()))
+		return A.p_losses(x,c,B,*C,**D)
+	def apply_model(A,x_noisy,t,cond,return_ids=_B):
+		M=return_ids;H=x_noisy;B=cond
+		if isinstance(B,dict):0
+		else:
+			if not isinstance(B,list):B=[B]
+			U=_d if A.model.conditioning_key==_H else _J;B={U:B}
+		if hasattr(A,_K):
+			assert len(B)==1;assert not M;F=A.split_input_params[_L];I=A.split_input_params[_M];e,V=H.shape[-2:];W,N,X,Y=A.get_fold_unfold(H,F,I);D=N(H);D=D.view((D.shape[0],-1,F[0],F[1],D.shape[-1]));Z=[D[:,:,:,:,A]for A in range(D.shape[-1])]
+			if A.cond_stage_key in[_Q,'LR_image','segmentation','bbox_img']and A.model.conditioning_key:a=next(iter(B.keys()));C=next(iter(B.values()));assert len(C)==1;C=C[0];C=N(C);C=C.view((C.shape[0],-1,F[0],F[1],C.shape[-1]));L=[{a:[C[:,:,:,:,A]]}for A in range(C.shape[-1])]
+			elif A.cond_stage_key==_X:assert _c in A.split_input_params,'BoudingBoxRescaling is missing original_image_size';O=int((V-F[0])/I[0]+1);P,Q=A.split_input_params[_c];b=A.first_stage_model.encoder.num_resolutions-1;J=2**b;c=[(J*I[0]*(A%O)/Q,J*I[1]*(A//O)/P)for A in range(D.shape[-1])];d=[(A,B,J*F[0]/Q,J*F[1]/P)for(A,B)in c];R=[torch.LongTensor(A.bbox_tokenizer._crop_encoder(B))[_A].to(A.device)for B in d];print(R[0].shape);assert isinstance(B,dict),'cond must be dict to be fed into model';S=B[_J][0][...,:-2].to(A.device);print(S.shape);E=torch.stack([torch.cat([S,A],dim=1)for A in R]);E=rearrange(E,'l b n -> (l b) n');print(E.shape);E=A.get_learned_conditioning(E);print(E.shape);E=rearrange(E,'(l b) n d -> l b n d',l=D.shape[-1]);print(E.shape);L=[{_J:[A]}for A in E]
+			else:L=[B for A in range(D.shape[-1])]
+			T=[A.model(Z[B],t,**L[B])for B in range(D.shape[-1])];assert not isinstance(T[0],tuple);G=torch.stack(T,axis=-1);G=G*Y;G=G.view((G.shape[0],-1,G.shape[-1]));K=W(G)/X
+		else:K=A.model(H,t,**B)
+		if isinstance(K,tuple)and not M:return K[0]
+		else:return K
+	def _predict_eps_from_xstart(B,x_t,t,pred_xstart):A=x_t;return(extract_into_tensor(B.sqrt_recip_alphas_cumprod,t,A.shape)*A-pred_xstart)/extract_into_tensor(B.sqrt_recipm1_alphas_cumprod,t,A.shape)
+	def _prior_bpd(B,x_start):"\n        Get the prior KL term for the variational lower-bound, measured in\n        bits-per-dim.\n        This term can't be optimized, as it only depends on the encoder.\n        :param x_start: the [N x C x ...] tensor of inputs.\n        :return: a batch of [N] KL values (in bits), one per batch element.\n        ";A=x_start;C=A.shape[0];D=torch.tensor([B.num_timesteps-1]*C,device=A.device);E,H,F=B.q_mean_variance(A,D);G=normal_kl(mean1=E,logvar1=F,mean2=_E,logvar2=_E);return mean_flat(G)/np.log(2.)
+	def p_losses(A,x_start,cond,t,noise=_A):
+		G=x_start;D=noise;D=default(D,lambda:torch.randn_like(G));L=A.q_sample(x_start=G,t=t,noise=D);I=A.apply_model(L,t,cond);B={};E=_R if A.training else'val'
+		if A.parameterization==_G:H=G
+		elif A.parameterization==_F:H=D
+		else:raise NotImplementedError()
+		J=A.get_loss(I,H,mean=_B).mean([1,2,3]);B.update({f"{E}/loss_simple":J.mean()});K=A.logvar[t].to(A.device);C=J/torch.exp(K)+K
+		if A.learn_logvar:B.update({f"{E}/loss_gamma":C.mean()});B.update({'logvar':A.logvar.data.mean()})
+		C=A.l_simple_weight*C.mean();F=A.get_loss(I,H,mean=_B).mean(dim=(1,2,3));F=(A.lvlb_weights[t]*F).mean();B.update({f"{E}/loss_vlb":F});C+=A.original_elbo_weight*F;B.update({f"{E}/loss":C});return C,B
+	def p_mean_variance(A,x,c,t,clip_denoised,return_codebook_ids=_B,quantize_denoised=_B,return_x0=_B,score_corrector=_A,corrector_kwargs=_A):
+		H=score_corrector;D=return_codebook_ids;J=t;B=A.apply_model(x,J,c,return_ids=D)
+		if H is not _A:assert A.parameterization==_F;B=H.modify_score(A,B,x,t,c,**corrector_kwargs)
+		if D:B,K=B
+		if A.parameterization==_F:C=A.predict_start_from_noise(x,t=t,noise=B)
+		elif A.parameterization==_G:C=B
+		else:raise NotImplementedError()
+		if clip_denoised:C.clamp_(-_D,_D)
+		if quantize_denoised:C,I,[I,I,L]=A.first_stage_model.quantize(C)
+		E,F,G=A.q_posterior(x_start=C,x_t=x,t=t)
+		if D:return E,F,G,K
+		elif return_x0:return E,F,G,C
+		else:return E,F,G
+	@torch.no_grad()
+	def p_sample(self,x,c,t,clip_denoised=_B,repeat_noise=_B,return_codebook_ids=_B,quantize_denoised=_B,return_x0=_B,temperature=_D,noise_dropout=_E,score_corrector=_A,corrector_kwargs=_A):
+		I=noise_dropout;E=return_x0;D=return_codebook_ids;J,*F,K=*x.shape,x.device;G=self.p_mean_variance(x=x,c=c,t=t,clip_denoised=clip_denoised,return_codebook_ids=D,quantize_denoised=quantize_denoised,return_x0=E,score_corrector=score_corrector,corrector_kwargs=corrector_kwargs)
+		if D:raise DeprecationWarning('Support dropped.');A,F,B,L=G
+		elif E:A,F,B,M=G
+		else:A,F,B=G
+		C=noise_like(x.shape,K,repeat_noise)*temperature
+		if I>_E:C=torch.nn.functional.dropout(C,p=I)
+		H=(1-(t==0).float()).reshape(J,*(1,)*(len(x.shape)-1))
+		if D:return A+H*(.5*B).exp()*C,L.argmax(dim=1)
+		if E:return A+H*(.5*B).exp()*C,M
+		else:return A+H*(.5*B).exp()*C
+	@torch.no_grad()
+	def progressive_denoising(self,cond,shape,verbose=_C,callback=_A,quantize_denoised=_B,img_callback=_A,mask=_A,x0=_A,temperature=_D,noise_dropout=_E,score_corrector=_A,corrector_kwargs=_A,batch_size=_A,x_T=_A,start_T=_A,log_every_t=_A):
+		N=start_T;M=img_callback;L=callback;J=log_every_t;I=mask;H=temperature;G=shape;C=batch_size;B=self;A=cond
+		if not J:J=B.log_every_t
+		D=B.num_timesteps
+		if C is not _A:O=C if C is not _A else G[0];G=[C]+list(G)
+		else:O=C=G[0]
+		if x_T is _A:E=torch.randn(G,device=B.device)
+		else:E=x_T
+		P=[]
+		if A is not _A:
+			if isinstance(A,dict):A={B:A[B][:C]if not isinstance(A[B],list)else[A[:C]for A in A[B]]for B in A}
+			else:A=[A[:C]for A in A]if isinstance(A,list)else A[:C]
+		if N is not _A:D=min(D,N)
+		Q=tqdm(reversed(range(0,D)),desc=_n,total=D)if verbose else reversed(range(0,D))
+		if type(H)==float:H=[H]*D
+		for F in Q:
+			K=torch.full((O,),F,device=B.device,dtype=torch.long)
+			if B.shorten_cond_schedule:assert B.model.conditioning_key!=_N;R=B.cond_ids[K].to(A.device);A=B.q_sample(x_start=A,t=R,noise=torch.randn_like(A))
+			E,S=B.p_sample(E,A,K,clip_denoised=B.clip_denoised,quantize_denoised=quantize_denoised,return_x0=_C,temperature=H[F],noise_dropout=noise_dropout,score_corrector=score_corrector,corrector_kwargs=corrector_kwargs)
+			if I is not _A:assert x0 is not _A;T=B.q_sample(x0,K);E=T*I+(_D-I)*E
+			if F%J==0 or F==D-1:P.append(S)
+			if L:L(F)
+			if M:M(E,F)
+		return E,P
+	@torch.no_grad()
+	def p_sample_loop(self,cond,shape,return_intermediates=_B,x_T=_A,verbose=_C,callback=_A,timesteps=_A,quantize_denoised=_B,mask=_A,x0=_A,img_callback=_A,start_T=_A,log_every_t=_A):
+		L=start_T;K=img_callback;J=callback;I=shape;G=log_every_t;E=mask;D=cond;C=timesteps;A=self
+		if not G:G=A.log_every_t
+		M=A.betas.device;O=I[0]
+		if x_T is _A:B=torch.randn(I,device=M)
+		else:B=x_T
+		N=[B]
+		if C is _A:C=A.num_timesteps
+		if L is not _A:C=min(C,L)
+		P=tqdm(reversed(range(0,C)),desc=_e,total=C)if verbose else reversed(range(0,C))
+		if E is not _A:assert x0 is not _A;assert x0.shape[2:3]==E.shape[2:3]
+		for F in P:
+			H=torch.full((O,),F,device=M,dtype=torch.long)
+			if A.shorten_cond_schedule:assert A.model.conditioning_key!=_N;Q=A.cond_ids[H].to(D.device);D=A.q_sample(x_start=D,t=Q,noise=torch.randn_like(D))
+			B=A.p_sample(B,D,H,clip_denoised=A.clip_denoised,quantize_denoised=quantize_denoised)
+			if E is not _A:R=A.q_sample(x0,H);B=R*E+(_D-E)*B
+			if F%G==0 or F==C-1:N.append(B)
+			if J:J(F)
+			if K:K(B,F)
+		if return_intermediates:return B,N
+		return B
+	@torch.no_grad()
+	def sample(self,cond,batch_size=16,return_intermediates=_B,x_T=_A,verbose=_C,timesteps=_A,quantize_denoised=_B,mask=_A,x0=_A,shape=_A,**E):
+		D=shape;C=self;B=batch_size;A=cond
+		if D is _A:D=B,C.channels,C.image_size,C.image_size
+		if A is not _A:
+			if isinstance(A,dict):A={C:A[C][:B]if not isinstance(A[C],list)else[A[:B]for A in A[C]]for C in A}
+			else:A=[A[:B]for A in A]if isinstance(A,list)else A[:B]
+		return C.p_sample_loop(A,D,return_intermediates=return_intermediates,x_T=x_T,verbose=verbose,timesteps=timesteps,quantize_denoised=quantize_denoised,mask=mask,x0=x0)
+	@torch.no_grad()
+	def sample_log(self,cond,batch_size,ddim,ddim_steps,**C):
+		B=batch_size;A=self
+		if ddim:F=DDIMSampler(A);G=A.channels,A.image_size,A.image_size;D,E=F.sample(ddim_steps,B,G,cond,verbose=_B,**C)
+		else:D,E=A.sample(cond=cond,batch_size=B,return_intermediates=_C,**C)
+		return D,E
+	@torch.no_grad()
+	def log_images(self,batch,N=8,n_row=4,sample=_C,ddim_steps=200,ddim_eta=_D,return_keys=_A,quantize_denoised=_C,inpaint=_C,plot_denoise_rows=_B,plot_progressive_rows=_C,plot_diffusion_rows=_C,**f):
+		T=return_keys;S=batch;R='conditioning';P=ddim_eta;O=n_row;J=ddim_steps;A=self;Q=J is not _A;B={};K,H,D,Y,C=A.get_input(S,A.first_stage_key,return_first_stage_outputs=_C,force_c_encode=_C,return_original_cond=_C,bs=N);N=min(D.shape[0],N);O=min(D.shape[0],O);B[_f]=D;B['reconstruction']=Y
+		if A.model.conditioning_key is not _A:
+			if hasattr(A.cond_stage_model,'decode'):C=A.cond_stage_model.decode(H);B[R]=C
+			elif A.cond_stage_key in[_W]:C=log_txt_as_img((D.shape[2],D.shape[3]),S[_W]);B[R]=C
+			elif A.cond_stage_key==_m:C=log_txt_as_img((D.shape[2],D.shape[3]),S['human_label']);B[R]=C
+			elif isimage(C):B[R]=C
+			if ismap(C):B['original_conditioning']=A.to_rgb(C)
+		if plot_diffusion_rows:
+			L=[];W=K[:O]
+			for E in range(A.num_timesteps):
+				if E%A.log_every_t==0 or E==A.num_timesteps-1:E=repeat(torch.tensor([E]),_g,b=O);E=E.to(A.device).long();Z=torch.randn_like(W);a=A.q_sample(x_start=W,t=E,noise=Z);L.append(A.decode_first_stage(a))
+			L=torch.stack(L);M=rearrange(L,_T);M=rearrange(M,_U);M=make_grid(M,nrow=L.shape[0]);B[_h]=M
+		if sample:
+			with A.ema_scope(_i):F,X=A.sample_log(cond=H,batch_size=N,ddim=Q,ddim_steps=J,eta=P)
+			G=A.decode_first_stage(F);B[_j]=G
+			if plot_denoise_rows:b=A._get_denoise_row_from_list(X);B[_k]=b
+			if quantize_denoised and not isinstance(A.first_stage_model,AutoencoderKL)and not isinstance(A.first_stage_model,IdentityFirstStage):
+				with A.ema_scope('Plotting Quantized Denoised'):F,X=A.sample_log(cond=H,batch_size=N,ddim=Q,ddim_steps=J,eta=P,quantize_denoised=_C)
+				G=A.decode_first_stage(F.to(A.device));B['samples_x0_quantized']=G
+			if inpaint:
+				U,V=K.shape[2],K.shape[3];I=torch.ones(N,U,V).to(A.device);I[:,U//4:3*U//4,V//4:3*V//4]=_E;I=I[:,_A,...]
+				with A.ema_scope('Plotting Inpaint'):F,c=A.sample_log(cond=H,batch_size=N,ddim=Q,eta=P,ddim_steps=J,x0=K[:N],mask=I)
+				G=A.decode_first_stage(F.to(A.device));B['samples_inpainting']=G;B['mask']=I
+				with A.ema_scope('Plotting Outpaint'):F,c=A.sample_log(cond=H,batch_size=N,ddim=Q,eta=P,ddim_steps=J,x0=K[:N],mask=I)
+				G=A.decode_first_stage(F.to(A.device));B['samples_outpainting']=G
+		if plot_progressive_rows:
+			with A.ema_scope('Plotting Progressives'):g,d=A.progressive_denoising(H,shape=(A.channels,A.image_size,A.image_size),batch_size=N)
+			e=A._get_denoise_row_from_list(d,desc=_n);B['progressive_row']=e
+		if T:
+			if np.intersect1d(list(B.keys()),T).shape[0]==0:return B
+			else:return{A:B[A]for A in T}
+		return B
+	def configure_optimizers(A):
+		E=A.learning_rate;B=list(A.model.parameters())
+		if A.cond_stage_trainable:print(f"{A.__class__.__name__}: Also optimizing conditioner params!");B=B+list(A.cond_stage_model.parameters())
+		if A.learn_logvar:print('Diffusion model optimizing logvar');B.append(A.logvar)
+		C=torch.optim.AdamW(B,lr=E)
+		if A.use_scheduler:assert'target'in A.scheduler_config;D=instantiate_from_config(A.scheduler_config);print('Setting up LambdaLR scheduler...');D=[{'scheduler':LambdaLR(C,lr_lambda=D.schedule),'interval':'step','frequency':1}];return[C],D
+		return C
+	@torch.no_grad()
+	def to_rgb(self,x):
+		A=self;x=x.float()
+		if not hasattr(A,'colorize'):A.colorize=torch.randn(3,x.shape[1],1,1).to(x)
+		x=nn.functional.conv2d(x,weight=A.colorize);x=2.*(x-x.min())/(x.max()-x.min())-_D;return x
 class DiffusionWrapperV1(pl.LightningModule):
-    def __init__(self, diff_model_config, conditioning_key):
-        super().__init__()
-        self.diffusion_model = instantiate_from_config(diff_model_config)
-        self.conditioning_key = conditioning_key
-        assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
-
-    def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):
-        if self.conditioning_key is None:
-            out = self.diffusion_model(x, t)
-        elif self.conditioning_key == 'concat':
-            xc = torch.cat([x] + c_concat, dim=1)
-            out = self.diffusion_model(xc, t)
-        elif self.conditioning_key == 'crossattn':
-            cc = torch.cat(c_crossattn, 1)
-            out = self.diffusion_model(x, t, context=cc)
-        elif self.conditioning_key == 'hybrid':
-            xc = torch.cat([x] + c_concat, dim=1)
-            cc = torch.cat(c_crossattn, 1)
-            out = self.diffusion_model(xc, t, context=cc)
-        elif self.conditioning_key == 'adm':
-            cc = c_crossattn[0]
-            out = self.diffusion_model(x, t, y=cc)
-        else:
-            raise NotImplementedError()
-
-        return out
-
-
+	def __init__(A,diff_model_config,conditioning_key):super().__init__();A.diffusion_model=instantiate_from_config(diff_model_config);A.conditioning_key=conditioning_key;assert A.conditioning_key in[_A,_H,_I,_N,_O]
+	def forward(A,x,t,c_concat=_A,c_crossattn=_A):
+		F=c_concat;D=c_crossattn
+		if A.conditioning_key is _A:B=A.diffusion_model(x,t)
+		elif A.conditioning_key==_H:E=torch.cat([x]+F,dim=1);B=A.diffusion_model(E,t)
+		elif A.conditioning_key==_I:C=torch.cat(D,1);B=A.diffusion_model(x,t,context=C)
+		elif A.conditioning_key==_N:E=torch.cat([x]+F,dim=1);C=torch.cat(D,1);B=A.diffusion_model(E,t,context=C)
+		elif A.conditioning_key==_O:C=D[0];B=A.diffusion_model(x,t,y=C)
+		else:raise NotImplementedError()
+		return B
 class Layout2ImgDiffusionV1(LatentDiffusionV1):
-    # TODO: move all layout-specific hacks to this class
-    def __init__(self, cond_stage_key, *args, **kwargs):
-        assert cond_stage_key == 'coordinates_bbox', 'Layout2ImgDiffusion only for cond_stage_key="coordinates_bbox"'
-        super().__init__(*args, cond_stage_key=cond_stage_key, **kwargs)
-
-    def log_images(self, batch, N=8, *args, **kwargs):
-        logs = super().log_images(*args, batch=batch, N=N, **kwargs)
-
-        key = 'train' if self.training else 'validation'
-        dset = self.trainer.datamodule.datasets[key]
-        mapper = dset.conditional_builders[self.cond_stage_key]
-
-        bbox_imgs = []
-        map_fn = lambda catno: dset.get_textual_label(dset.get_category_id(catno))
-        for tknzd_bbox in batch[self.cond_stage_key][:N]:
-            bboximg = mapper.plot(tknzd_bbox.detach().cpu(), map_fn, (256, 256))
-            bbox_imgs.append(bboximg)
-
-        cond_img = torch.stack(bbox_imgs, dim=0)
-        logs['bbox_image'] = cond_img
-        return logs
-
-ldm.models.diffusion.ddpm.DDPMV1 = DDPMV1
-ldm.models.diffusion.ddpm.LatentDiffusionV1 = LatentDiffusionV1
-ldm.models.diffusion.ddpm.DiffusionWrapperV1 = DiffusionWrapperV1
-ldm.models.diffusion.ddpm.Layout2ImgDiffusionV1 = Layout2ImgDiffusionV1
+	def __init__(D,cond_stage_key,*B,**C):A=cond_stage_key;assert A==_X,'Layout2ImgDiffusion only for cond_stage_key="coordinates_bbox"';super().__init__(*B,cond_stage_key=A,**C)
+	def log_images(A,batch,N=8,*F,**G):
+		C=batch;D=super().log_images(*F,batch=C,N=N,**G);H=_R if A.training else'validation';B=A.trainer.datamodule.datasets[H];I=B.conditional_builders[A.cond_stage_key];E=[];J=lambda catno:B.get_textual_label(B.get_category_id(catno))
+		for K in C[A.cond_stage_key][:N]:L=I.plot(K.detach().cpu(),J,(256,256));E.append(L)
+		M=torch.stack(E,dim=0);D['bbox_image']=M;return D
+ldm.models.diffusion.ddpm.DDPMV1=DDPMV1
+ldm.models.diffusion.ddpm.LatentDiffusionV1=LatentDiffusionV1
+ldm.models.diffusion.ddpm.DiffusionWrapperV1=DiffusionWrapperV1
+ldm.models.diffusion.ddpm.Layout2ImgDiffusionV1=Layout2ImgDiffusionV1

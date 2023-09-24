@@ -1,58 +1,26 @@
-import os
-import re
-
+import os,re
 from modules import shared
 from modules.paths_internal import script_path
-
-
-def natural_sort_key(s, regex=re.compile('([0-9]+)')):
-    return [int(text) if text.isdigit() else text.lower() for text in regex.split(s)]
-
-
-def listfiles(dirname):
-    filenames = [os.path.join(dirname, x) for x in sorted(os.listdir(dirname), key=natural_sort_key) if not x.startswith(".")]
-    return [file for file in filenames if os.path.isfile(file)]
-
-
-def html_path(filename):
-    return os.path.join(script_path, "html", filename)
-
-
+def natural_sort_key(s,regex=re.compile('([0-9]+)')):return[int(A)if A.isdigit()else A.lower()for A in regex.split(s)]
+def listfiles(dirname):A=dirname;B=[os.path.join(A,B)for B in sorted(os.listdir(A),key=natural_sort_key)if not B.startswith('.')];return[A for A in B if os.path.isfile(A)]
+def html_path(filename):return os.path.join(script_path,'html',filename)
 def html(filename):
-    path = html_path(filename)
-
-    if os.path.exists(path):
-        with open(path, encoding="utf8") as file:
-            return file.read()
-
-    return ""
-
-
-def walk_files(path, allowed_extensions=None):
-    if not os.path.exists(path):
-        return
-
-    if allowed_extensions is not None:
-        allowed_extensions = set(allowed_extensions)
-
-    items = list(os.walk(path, followlinks=True))
-    items = sorted(items, key=lambda x: natural_sort_key(x[0]))
-
-    for root, _, files in items:
-        for filename in sorted(files, key=natural_sort_key):
-            if allowed_extensions is not None:
-                _, ext = os.path.splitext(filename)
-                if ext not in allowed_extensions:
-                    continue
-
-            if not shared.opts.list_hidden_files and ("/." in root or "\\." in root):
-                continue
-
-            yield os.path.join(root, filename)
-
-
-def ldm_print(*args, **kwargs):
-    if shared.opts.hide_ldm_prints:
-        return
-
-    print(*args, **kwargs)
+	A=html_path(filename)
+	if os.path.exists(A):
+		with open(A,encoding='utf8')as B:return B.read()
+	return''
+def walk_files(path,allowed_extensions=None):
+	A=allowed_extensions
+	if not os.path.exists(path):return
+	if A is not None:A=set(A)
+	B=list(os.walk(path,followlinks=True));B=sorted(B,key=lambda x:natural_sort_key(x[0]))
+	for(C,E,F)in B:
+		for D in sorted(F,key=natural_sort_key):
+			if A is not None:
+				E,G=os.path.splitext(D)
+				if G not in A:continue
+			if not shared.opts.list_hidden_files and('/.'in C or'\\.'in C):continue
+			yield os.path.join(C,D)
+def ldm_print(*A,**B):
+	if shared.opts.hide_ldm_prints:return
+	print(*A,**B)

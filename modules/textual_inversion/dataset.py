@@ -1,246 +1,94 @@
-import os
-import numpy as np
-import PIL
-import torch
+_D='random'
+_C='once'
+_B=False
+_A=None
+import os,numpy as np,PIL,torch
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader, Sampler
+from torch.utils.data import Dataset,DataLoader,Sampler
 from torchvision import transforms
 from collections import defaultdict
-from random import shuffle, choices
-
-import random
-import tqdm
-from modules import devices, shared
+from random import shuffle,choices
+import random,tqdm
+from modules import devices,shared
 import re
-
 from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
-
-re_numbers_at_start = re.compile(r"^[-\d]+\s*")
-
-
+re_numbers_at_start=re.compile('^[-\\d]+\\s*')
 class DatasetEntry:
-    def __init__(self, filename=None, filename_text=None, latent_dist=None, latent_sample=None, cond=None, cond_text=None, pixel_values=None, weight=None):
-        self.filename = filename
-        self.filename_text = filename_text
-        self.weight = weight
-        self.latent_dist = latent_dist
-        self.latent_sample = latent_sample
-        self.cond = cond
-        self.cond_text = cond_text
-        self.pixel_values = pixel_values
-
-
+	def __init__(A,filename=_A,filename_text=_A,latent_dist=_A,latent_sample=_A,cond=_A,cond_text=_A,pixel_values=_A,weight=_A):A.filename=filename;A.filename_text=filename_text;A.weight=weight;A.latent_dist=latent_dist;A.latent_sample=latent_sample;A.cond=cond;A.cond_text=cond_text;A.pixel_values=pixel_values
 class PersonalizedBase(Dataset):
-    def __init__(self, data_root, width, height, repeats, flip_p=0.5, placeholder_token="*", model=None, cond_model=None, device=None, template_file=None, include_cond=False, batch_size=1, gradient_step=1, shuffle_tags=False, tag_drop_out=0, latent_sampling_method='once', varsize=False, use_weight=False):
-        re_word = re.compile(shared.opts.dataset_filename_word_regex) if shared.opts.dataset_filename_word_regex else None
-
-        self.placeholder_token = placeholder_token
-
-        self.flip = transforms.RandomHorizontalFlip(p=flip_p)
-
-        self.dataset = []
-
-        with open(template_file, "r") as file:
-            lines = [x.strip() for x in file.readlines()]
-
-        self.lines = lines
-
-        assert data_root, 'dataset directory not specified'
-        assert os.path.isdir(data_root), "Dataset directory doesn't exist"
-        assert os.listdir(data_root), "Dataset directory is empty"
-
-        self.image_paths = [os.path.join(data_root, file_path) for file_path in os.listdir(data_root)]
-
-        self.shuffle_tags = shuffle_tags
-        self.tag_drop_out = tag_drop_out
-        groups = defaultdict(list)
-
-        print("Preparing dataset...")
-        for path in tqdm.tqdm(self.image_paths):
-            alpha_channel = None
-            if shared.state.interrupted:
-                raise Exception("interrupted")
-            try:
-                image = Image.open(path)
-                #Currently does not work for single color transparency
-                #We would need to read image.info['transparency'] for that
-                if use_weight and 'A' in image.getbands():
-                    alpha_channel = image.getchannel('A')
-                image = image.convert('RGB')
-                if not varsize:
-                    image = image.resize((width, height), PIL.Image.BICUBIC)
-            except Exception:
-                continue
-
-            text_filename = f"{os.path.splitext(path)[0]}.txt"
-            filename = os.path.basename(path)
-
-            if os.path.exists(text_filename):
-                with open(text_filename, "r", encoding="utf8") as file:
-                    filename_text = file.read()
-            else:
-                filename_text = os.path.splitext(filename)[0]
-                filename_text = re.sub(re_numbers_at_start, '', filename_text)
-                if re_word:
-                    tokens = re_word.findall(filename_text)
-                    filename_text = (shared.opts.dataset_filename_join_string or "").join(tokens)
-
-            npimage = np.array(image).astype(np.uint8)
-            npimage = (npimage / 127.5 - 1.0).astype(np.float32)
-
-            torchdata = torch.from_numpy(npimage).permute(2, 0, 1).to(device=device, dtype=torch.float32)
-            latent_sample = None
-
-            with devices.autocast():
-                latent_dist = model.encode_first_stage(torchdata.unsqueeze(dim=0))
-
-            #Perform latent sampling, even for random sampling.
-            #We need the sample dimensions for the weights
-            if latent_sampling_method == "deterministic":
-                if isinstance(latent_dist, DiagonalGaussianDistribution):
-                    # Works only for DiagonalGaussianDistribution
-                    latent_dist.std = 0
-                else:
-                    latent_sampling_method = "once"
-            latent_sample = model.get_first_stage_encoding(latent_dist).squeeze().to(devices.cpu)
-
-            if use_weight and alpha_channel is not None:
-                channels, *latent_size = latent_sample.shape
-                weight_img = alpha_channel.resize(latent_size)
-                npweight = np.array(weight_img).astype(np.float32)
-                #Repeat for every channel in the latent sample
-                weight = torch.tensor([npweight] * channels).reshape([channels] + latent_size)
-                #Normalize the weight to a minimum of 0 and a mean of 1, that way the loss will be comparable to default.
-                weight -= weight.min()
-                weight /= weight.mean()
-            elif use_weight:
-                #If an image does not have a alpha channel, add a ones weight map anyway so we can stack it later
-                weight = torch.ones(latent_sample.shape)
-            else:
-                weight = None
-
-            if latent_sampling_method == "random":
-                entry = DatasetEntry(filename=path, filename_text=filename_text, latent_dist=latent_dist, weight=weight)
-            else:
-                entry = DatasetEntry(filename=path, filename_text=filename_text, latent_sample=latent_sample, weight=weight)
-
-            if not (self.tag_drop_out != 0 or self.shuffle_tags):
-                entry.cond_text = self.create_text(filename_text)
-
-            if include_cond and not (self.tag_drop_out != 0 or self.shuffle_tags):
-                with devices.autocast():
-                    entry.cond = cond_model([entry.cond_text]).to(devices.cpu).squeeze(0)
-            groups[image.size].append(len(self.dataset))
-            self.dataset.append(entry)
-            del torchdata
-            del latent_dist
-            del latent_sample
-            del weight
-
-        self.length = len(self.dataset)
-        self.groups = list(groups.values())
-        assert self.length > 0, "No images have been found in the dataset."
-        self.batch_size = min(batch_size, self.length)
-        self.gradient_step = min(gradient_step, self.length // self.batch_size)
-        self.latent_sampling_method = latent_sampling_method
-
-        if len(groups) > 1:
-            print("Buckets:")
-            for (w, h), ids in sorted(groups.items(), key=lambda x: x[0]):
-                print(f"  {w}x{h}: {len(ids)}")
-            print()
-
-    def create_text(self, filename_text):
-        text = random.choice(self.lines)
-        tags = filename_text.split(',')
-        if self.tag_drop_out != 0:
-            tags = [t for t in tags if random.random() > self.tag_drop_out]
-        if self.shuffle_tags:
-            random.shuffle(tags)
-        text = text.replace("[filewords]", ','.join(tags))
-        text = text.replace("[name]", self.placeholder_token)
-        return text
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, i):
-        entry = self.dataset[i]
-        if self.tag_drop_out != 0 or self.shuffle_tags:
-            entry.cond_text = self.create_text(entry.filename_text)
-        if self.latent_sampling_method == "random":
-            entry.latent_sample = shared.sd_model.get_first_stage_encoding(entry.latent_dist).to(devices.cpu)
-        return entry
-
-
+	def __init__(A,data_root,width,height,repeats,flip_p=.5,placeholder_token='*',model=_A,cond_model=_A,device=_A,template_file=_A,include_cond=_B,batch_size=1,gradient_step=1,shuffle_tags=_B,tag_drop_out=0,latent_sampling_method=_C,varsize=_B,use_weight=_B):
+		P=model;L=use_weight;J=latent_sampling_method;E=data_root;Q=re.compile(shared.opts.dataset_filename_word_regex)if shared.opts.dataset_filename_word_regex else _A;A.placeholder_token=placeholder_token;A.flip=transforms.RandomHorizontalFlip(p=flip_p);A.dataset=[]
+		with open(template_file,'r')as M:V=[A.strip()for A in M.readlines()]
+		A.lines=V;assert E,'dataset directory not specified';assert os.path.isdir(E),"Dataset directory doesn't exist";assert os.listdir(E),'Dataset directory is empty';A.image_paths=[os.path.join(E,A)for A in os.listdir(E)];A.shuffle_tags=shuffle_tags;A.tag_drop_out=tag_drop_out;K=defaultdict(list);print('Preparing dataset...')
+		for F in tqdm.tqdm(A.image_paths):
+			N=_A
+			if shared.state.interrupted:raise Exception('interrupted')
+			try:
+				C=Image.open(F)
+				if L and'A'in C.getbands():N=C.getchannel('A')
+				C=C.convert('RGB')
+				if not varsize:C=C.resize((width,height),PIL.Image.BICUBIC)
+			except Exception:continue
+			R=f"{os.path.splitext(F)[0]}.txt";W=os.path.basename(F)
+			if os.path.exists(R):
+				with open(R,'r',encoding='utf8')as M:D=M.read()
+			else:
+				D=os.path.splitext(W)[0];D=re.sub(re_numbers_at_start,'',D)
+				if Q:X=Q.findall(D);D=(shared.opts.dataset_filename_join_string or'').join(X)
+			O=np.array(C).astype(np.uint8);O=(O/127.5-1.).astype(np.float32);S=torch.from_numpy(O).permute(2,0,1).to(device=device,dtype=torch.float32);G=_A
+			with devices.autocast():H=P.encode_first_stage(S.unsqueeze(dim=0))
+			if J=='deterministic':
+				if isinstance(H,DiagonalGaussianDistribution):H.std=0
+				else:J=_C
+			G=P.get_first_stage_encoding(H).squeeze().to(devices.cpu)
+			if L and N is not _A:T,*U=G.shape;Y=N.resize(U);Z=np.array(Y).astype(np.float32);B=torch.tensor([Z]*T).reshape([T]+U);B-=B.min();B/=B.mean()
+			elif L:B=torch.ones(G.shape)
+			else:B=_A
+			if J==_D:I=DatasetEntry(filename=F,filename_text=D,latent_dist=H,weight=B)
+			else:I=DatasetEntry(filename=F,filename_text=D,latent_sample=G,weight=B)
+			if not(A.tag_drop_out!=0 or A.shuffle_tags):I.cond_text=A.create_text(D)
+			if include_cond and not(A.tag_drop_out!=0 or A.shuffle_tags):
+				with devices.autocast():I.cond=cond_model([I.cond_text]).to(devices.cpu).squeeze(0)
+			K[C.size].append(len(A.dataset));A.dataset.append(I);del S;del H;del G;del B
+		A.length=len(A.dataset);A.groups=list(K.values());assert A.length>0,'No images have been found in the dataset.';A.batch_size=min(batch_size,A.length);A.gradient_step=min(gradient_step,A.length//A.batch_size);A.latent_sampling_method=J
+		if len(K)>1:
+			print('Buckets:')
+			for((a,b),c)in sorted(K.items(),key=lambda x:x[0]):print(f"  {a}x{b}: {len(c)}")
+			print()
+	def create_text(A,filename_text):
+		B=random.choice(A.lines);C=filename_text.split(',')
+		if A.tag_drop_out!=0:C=[B for B in C if random.random()>A.tag_drop_out]
+		if A.shuffle_tags:random.shuffle(C)
+		B=B.replace('[filewords]',','.join(C));B=B.replace('[name]',A.placeholder_token);return B
+	def __len__(A):return A.length
+	def __getitem__(A,i):
+		B=A.dataset[i]
+		if A.tag_drop_out!=0 or A.shuffle_tags:B.cond_text=A.create_text(B.filename_text)
+		if A.latent_sampling_method==_D:B.latent_sample=shared.sd_model.get_first_stage_encoding(B.latent_dist).to(devices.cpu)
+		return B
 class GroupedBatchSampler(Sampler):
-    def __init__(self, data_source: PersonalizedBase, batch_size: int):
-        super().__init__(data_source)
-
-        n = len(data_source)
-        self.groups = data_source.groups
-        self.len = n_batch = n // batch_size
-        expected = [len(g) / n * n_batch * batch_size for g in data_source.groups]
-        self.base = [int(e) // batch_size for e in expected]
-        self.n_rand_batches = nrb = n_batch - sum(self.base)
-        self.probs = [e%batch_size/nrb/batch_size if nrb>0 else 0 for e in expected]
-        self.batch_size = batch_size
-
-    def __len__(self):
-        return self.len
-
-    def __iter__(self):
-        b = self.batch_size
-
-        for g in self.groups:
-            shuffle(g)
-
-        batches = []
-        for g in self.groups:
-            batches.extend(g[i*b:(i+1)*b] for i in range(len(g) // b))
-        for _ in range(self.n_rand_batches):
-            rand_group = choices(self.groups, self.probs)[0]
-            batches.append(choices(rand_group, k=b))
-
-        shuffle(batches)
-
-        yield from batches
-
-
+	def __init__(A,data_source,batch_size):C=data_source;B=batch_size;super().__init__(C);D=len(C);A.groups=C.groups;A.len=E=D//B;F=[len(A)/D*E*B for A in C.groups];A.base=[int(A)//B for A in F];A.n_rand_batches=G=E-sum(A.base);A.probs=[A%B/G/B if G>0 else 0 for A in F];A.batch_size=B
+	def __len__(A):return A.len
+	def __iter__(A):
+		B=A.batch_size
+		for C in A.groups:shuffle(C)
+		D=[]
+		for C in A.groups:D.extend(C[A*B:(A+1)*B]for A in range(len(C)//B))
+		for F in range(A.n_rand_batches):E=choices(A.groups,A.probs)[0];D.append(choices(E,k=B))
+		shuffle(D);yield from D
 class PersonalizedDataLoader(DataLoader):
-    def __init__(self, dataset, latent_sampling_method="once", batch_size=1, pin_memory=False):
-        super(PersonalizedDataLoader, self).__init__(dataset, batch_sampler=GroupedBatchSampler(dataset, batch_size), pin_memory=pin_memory)
-        if latent_sampling_method == "random":
-            self.collate_fn = collate_wrapper_random
-        else:
-            self.collate_fn = collate_wrapper
-
-
+	def __init__(A,dataset,latent_sampling_method=_C,batch_size=1,pin_memory=_B):
+		B=dataset;super(PersonalizedDataLoader,A).__init__(B,batch_sampler=GroupedBatchSampler(B,batch_size),pin_memory=pin_memory)
+		if latent_sampling_method==_D:A.collate_fn=collate_wrapper_random
+		else:A.collate_fn=collate_wrapper
 class BatchLoader:
-    def __init__(self, data):
-        self.cond_text = [entry.cond_text for entry in data]
-        self.cond = [entry.cond for entry in data]
-        self.latent_sample = torch.stack([entry.latent_sample for entry in data]).squeeze(1)
-        if all(entry.weight is not None for entry in data):
-            self.weight = torch.stack([entry.weight for entry in data]).squeeze(1)
-        else:
-            self.weight = None
-        #self.emb_index = [entry.emb_index for entry in data]
-        #print(self.latent_sample.device)
-
-    def pin_memory(self):
-        self.latent_sample = self.latent_sample.pin_memory()
-        return self
-
-def collate_wrapper(batch):
-    return BatchLoader(batch)
-
+	def __init__(A,data):
+		B=data;A.cond_text=[A.cond_text for A in B];A.cond=[A.cond for A in B];A.latent_sample=torch.stack([A.latent_sample for A in B]).squeeze(1)
+		if all(A.weight is not _A for A in B):A.weight=torch.stack([A.weight for A in B]).squeeze(1)
+		else:A.weight=_A
+	def pin_memory(A):A.latent_sample=A.latent_sample.pin_memory();return A
+def collate_wrapper(batch):return BatchLoader(batch)
 class BatchLoaderRandom(BatchLoader):
-    def __init__(self, data):
-        super().__init__(data)
-
-    def pin_memory(self):
-        return self
-
-def collate_wrapper_random(batch):
-    return BatchLoaderRandom(batch)
+	def __init__(A,data):super().__init__(data)
+	def pin_memory(A):return A
+def collate_wrapper_random(batch):return BatchLoaderRandom(batch)

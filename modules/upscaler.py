@@ -1,144 +1,52 @@
+_D='Resampling'
+_C=False
+_B=True
+_A=None
 import os
 from abc import abstractmethod
-
 import PIL
 from PIL import Image
-
 import modules.shared
-from modules import modelloader, shared
-
-LANCZOS = (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
-NEAREST = (Image.Resampling.NEAREST if hasattr(Image, 'Resampling') else Image.NEAREST)
-
-
+from modules import modelloader,shared
+LANCZOS=Image.Resampling.LANCZOS if hasattr(Image,_D)else Image.LANCZOS
+NEAREST=Image.Resampling.NEAREST if hasattr(Image,_D)else Image.NEAREST
 class Upscaler:
-    name = None
-    model_path = None
-    model_name = None
-    model_url = None
-    enable = True
-    filter = None
-    model = None
-    user_path = None
-    scalers: []
-    tile = True
-
-    def __init__(self, create_dirs=False):
-        self.mod_pad_h = None
-        self.tile_size = modules.shared.opts.ESRGAN_tile
-        self.tile_pad = modules.shared.opts.ESRGAN_tile_overlap
-        self.device = modules.shared.device
-        self.img = None
-        self.output = None
-        self.scale = 1
-        self.half = not modules.shared.cmd_opts.no_half
-        self.pre_pad = 0
-        self.mod_scale = None
-        self.model_download_path = None
-
-        if self.model_path is None and self.name:
-            self.model_path = os.path.join(shared.models_path, self.name)
-        if self.model_path and create_dirs:
-            os.makedirs(self.model_path, exist_ok=True)
-
-        try:
-            import cv2  # noqa: F401
-            self.can_tile = True
-        except Exception:
-            pass
-
-    @abstractmethod
-    def do_upscale(self, img: PIL.Image, selected_model: str):
-        return img
-
-    def upscale(self, img: PIL.Image, scale, selected_model: str = None):
-        self.scale = scale
-        dest_w = int((img.width * scale) // 8 * 8)
-        dest_h = int((img.height * scale) // 8 * 8)
-
-        for _ in range(3):
-            shape = (img.width, img.height)
-
-            img = self.do_upscale(img, selected_model)
-
-            if shape == (img.width, img.height):
-                break
-
-            if img.width >= dest_w and img.height >= dest_h:
-                break
-
-        if img.width != dest_w or img.height != dest_h:
-            img = img.resize((int(dest_w), int(dest_h)), resample=LANCZOS)
-
-        return img
-
-    @abstractmethod
-    def load_model(self, path: str):
-        pass
-
-    def find_models(self, ext_filter=None) -> list:
-        return modelloader.load_models(model_path=self.model_path, model_url=self.model_url, command_path=self.user_path, ext_filter=ext_filter)
-
-    def update_status(self, prompt):
-        print(f"\nextras: {prompt}", file=shared.progress_print_out)
-
-
+	name=_A;model_path=_A;model_name=_A;model_url=_A;enable=_B;filter=_A;model=_A;user_path=_A;scalers:0;tile=_B
+	def __init__(A,create_dirs=_C):
+		A.mod_pad_h=_A;A.tile_size=modules.shared.opts.ESRGAN_tile;A.tile_pad=modules.shared.opts.ESRGAN_tile_overlap;A.device=modules.shared.device;A.img=_A;A.output=_A;A.scale=1;A.half=not modules.shared.cmd_opts.no_half;A.pre_pad=0;A.mod_scale=_A;A.model_download_path=_A
+		if A.model_path is _A and A.name:A.model_path=os.path.join(shared.models_path,A.name)
+		if A.model_path and create_dirs:os.makedirs(A.model_path,exist_ok=_B)
+		try:import cv2;A.can_tile=_B
+		except Exception:pass
+	@abstractmethod
+	def do_upscale(self,img,selected_model):return img
+	def upscale(E,img,scale,selected_model=_A):
+		B=scale;A=img;E.scale=B;C=int(A.width*B//8*8);D=int(A.height*B//8*8)
+		for G in range(3):
+			F=A.width,A.height;A=E.do_upscale(A,selected_model)
+			if F==(A.width,A.height):break
+			if A.width>=C and A.height>=D:break
+		if A.width!=C or A.height!=D:A=A.resize((int(C),int(D)),resample=LANCZOS)
+		return A
+	@abstractmethod
+	def load_model(self,path):0
+	def find_models(A,ext_filter=_A):return modelloader.load_models(model_path=A.model_path,model_url=A.model_url,command_path=A.user_path,ext_filter=ext_filter)
+	def update_status(A,prompt):print(f"\nextras: {prompt}",file=shared.progress_print_out)
 class UpscalerData:
-    name = None
-    data_path = None
-    scale: int = 4
-    scaler: Upscaler = None
-    model: None
-
-    def __init__(self, name: str, path: str, upscaler: Upscaler = None, scale: int = 4, model=None):
-        self.name = name
-        self.data_path = path
-        self.local_data_path = path
-        self.scaler = upscaler
-        self.scale = scale
-        self.model = model
-
-
+	name=_A;data_path=_A;scale=4;scaler=_A;model:0
+	def __init__(A,name,path,upscaler=_A,scale=4,model=_A):A.name=name;A.data_path=path;A.local_data_path=path;A.scaler=upscaler;A.scale=scale;A.model=model
 class UpscalerNone(Upscaler):
-    name = "None"
-    scalers = []
-
-    def load_model(self, path):
-        pass
-
-    def do_upscale(self, img, selected_model=None):
-        return img
-
-    def __init__(self, dirname=None):
-        super().__init__(False)
-        self.scalers = [UpscalerData("None", None, self)]
-
-
+	name='None';scalers=[]
+	def load_model(A,path):0
+	def do_upscale(A,img,selected_model=_A):return img
+	def __init__(A,dirname=_A):super().__init__(_C);A.scalers=[UpscalerData('None',_A,A)]
 class UpscalerLanczos(Upscaler):
-    scalers = []
-
-    def do_upscale(self, img, selected_model=None):
-        return img.resize((int(img.width * self.scale), int(img.height * self.scale)), resample=LANCZOS)
-
-    def load_model(self, _):
-        pass
-
-    def __init__(self, dirname=None):
-        super().__init__(False)
-        self.name = "Lanczos"
-        self.scalers = [UpscalerData("Lanczos", None, self)]
-
-
+	scalers=[]
+	def do_upscale(B,img,selected_model=_A):A=img;return A.resize((int(A.width*B.scale),int(A.height*B.scale)),resample=LANCZOS)
+	def load_model(A,_):0
+	def __init__(A,dirname=_A):B='Lanczos';super().__init__(_C);A.name=B;A.scalers=[UpscalerData(B,_A,A)]
 class UpscalerNearest(Upscaler):
-    scalers = []
-
-    def do_upscale(self, img, selected_model=None):
-        return img.resize((int(img.width * self.scale), int(img.height * self.scale)), resample=NEAREST)
-
-    def load_model(self, _):
-        pass
-
-    def __init__(self, dirname=None):
-        super().__init__(False)
-        self.name = "Nearest"
-        self.scalers = [UpscalerData("Nearest", None, self)]
+	scalers=[]
+	def do_upscale(B,img,selected_model=_A):A=img;return A.resize((int(A.width*B.scale),int(A.height*B.scale)),resample=NEAREST)
+	def load_model(A,_):0
+	def __init__(A,dirname=_A):B='Nearest';super().__init__(_C);A.name=B;A.scalers=[UpscalerData(B,_A,A)]

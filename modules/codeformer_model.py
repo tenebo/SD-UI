@@ -1,132 +1,43 @@
-import os
-
-import cv2
-import torch
-
-import modules.face_restoration
-import modules.shared
-from modules import shared, devices, modelloader, errors
+_A=None
+import os,cv2,torch,modules.face_restoration,modules.shared
+from modules import shared,devices,modelloader,errors
 from modules.paths import models_path
-
-# codeformer people made a choice to include modified basicsr library to their project which makes
-# it utterly impossible to use it alongside with other libraries that also use basicsr, like GFPGAN.
-# I am making a choice to include some files from codeformer to work around this issue.
-model_dir = "Codeformer"
-model_path = os.path.join(models_path, model_dir)
-model_url = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
-
-codeformer = None
-
-
+model_dir='Codeformer'
+model_path=os.path.join(models_path,model_dir)
+model_url='https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
+codeformer=_A
 def setup_model(dirname):
-    os.makedirs(model_path, exist_ok=True)
-
-    path = modules.paths.paths.get("CodeFormer", None)
-    if path is None:
-        return
-
-    try:
-        from torchvision.transforms.functional import normalize
-        from modules.codeformer.codeformer_arch import CodeFormer
-        from basicsr.utils import img2tensor, tensor2img
-        from facelib.utils.face_restoration_helper import FaceRestoreHelper
-        from facelib.detection.retinaface import retinaface
-
-        net_class = CodeFormer
-
-        class FaceRestorerCodeFormer(modules.face_restoration.FaceRestoration):
-            def name(self):
-                return "CodeFormer"
-
-            def __init__(self, dirname):
-                self.net = None
-                self.face_helper = None
-                self.cmd_dir = dirname
-
-            def create_models(self):
-
-                if self.net is not None and self.face_helper is not None:
-                    self.net.to(devices.device_codeformer)
-                    return self.net, self.face_helper
-                model_paths = modelloader.load_models(model_path, model_url, self.cmd_dir, download_name='codeformer-v0.1.0.pth', ext_filter=['.pth'])
-                if len(model_paths) != 0:
-                    ckpt_path = model_paths[0]
-                else:
-                    print("Unable to load codeformer model.")
-                    return None, None
-                net = net_class(dim_embd=512, codebook_size=1024, n_head=8, n_layers=9, connect_list=['32', '64', '128', '256']).to(devices.device_codeformer)
-                checkpoint = torch.load(ckpt_path)['params_ema']
-                net.load_state_dict(checkpoint)
-                net.eval()
-
-                if hasattr(retinaface, 'device'):
-                    retinaface.device = devices.device_codeformer
-                face_helper = FaceRestoreHelper(1, face_size=512, crop_ratio=(1, 1), det_model='retinaface_resnet50', save_ext='png', use_parse=True, device=devices.device_codeformer)
-
-                self.net = net
-                self.face_helper = face_helper
-
-                return net, face_helper
-
-            def send_model_to(self, device):
-                self.net.to(device)
-                self.face_helper.face_det.to(device)
-                self.face_helper.face_parse.to(device)
-
-            def restore(self, np_image, w=None):
-                np_image = np_image[:, :, ::-1]
-
-                original_resolution = np_image.shape[0:2]
-
-                self.create_models()
-                if self.net is None or self.face_helper is None:
-                    return np_image
-
-                self.send_model_to(devices.device_codeformer)
-
-                self.face_helper.clean_all()
-                self.face_helper.read_image(np_image)
-                self.face_helper.get_face_landmarks_5(only_center_face=False, resize=640, eye_dist_threshold=5)
-                self.face_helper.align_warp_face()
-
-                for cropped_face in self.face_helper.cropped_faces:
-                    cropped_face_t = img2tensor(cropped_face / 255., bgr2rgb=True, float32=True)
-                    normalize(cropped_face_t, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True)
-                    cropped_face_t = cropped_face_t.unsqueeze(0).to(devices.device_codeformer)
-
-                    try:
-                        with torch.no_grad():
-                            output = self.net(cropped_face_t, w=w if w is not None else shared.opts.code_former_weight, adain=True)[0]
-                            restored_face = tensor2img(output, rgb2bgr=True, min_max=(-1, 1))
-                        del output
-                        devices.torch_gc()
-                    except Exception:
-                        errors.report('Failed inference for CodeFormer', exc_info=True)
-                        restored_face = tensor2img(cropped_face_t, rgb2bgr=True, min_max=(-1, 1))
-
-                    restored_face = restored_face.astype('uint8')
-                    self.face_helper.add_restored_face(restored_face)
-
-                self.face_helper.get_inverse_affine(None)
-
-                restored_img = self.face_helper.paste_faces_to_input_image()
-                restored_img = restored_img[:, :, ::-1]
-
-                if original_resolution != restored_img.shape[0:2]:
-                    restored_img = cv2.resize(restored_img, (0, 0), fx=original_resolution[1]/restored_img.shape[1], fy=original_resolution[0]/restored_img.shape[0], interpolation=cv2.INTER_LINEAR)
-
-                self.face_helper.clean_all()
-
-                if shared.opts.face_restoration_unload:
-                    self.send_model_to(devices.cpu)
-
-                return restored_img
-
-        global codeformer
-        codeformer = FaceRestorerCodeFormer(dirname)
-        shared.face_restorers.append(codeformer)
-
-    except Exception:
-        errors.report("Error setting up CodeFormer", exc_info=True)
-
-   # sys.path = stored_sys_path
+	A='CodeFormer';B=True;os.makedirs(model_path,exist_ok=B);C=modules.paths.paths.get(A,_A)
+	if C is _A:return
+	try:
+		from torchvision.transforms.functional import normalize as J;from modules.codeformer.codeformer_arch import CodeFormer as E;from basicsr.utils import img2tensor as K,tensor2img as H;from facelib.utils.face_restoration_helper import FaceRestoreHelper as G;from facelib.detection.retinaface import retinaface as D;I=E
+		class F(modules.face_restoration.FaceRestoration):
+			def name(B):return A
+			def __init__(A,dirname):A.net=_A;A.face_helper=_A;A.cmd_dir=dirname
+			def create_models(A):
+				if A.net is not _A and A.face_helper is not _A:A.net.to(devices.device_codeformer);return A.net,A.face_helper
+				E=modelloader.load_models(model_path,model_url,A.cmd_dir,download_name='codeformer-v0.1.0.pth',ext_filter=['.pth'])
+				if len(E)!=0:H=E[0]
+				else:print('Unable to load codeformer model.');return _A,_A
+				C=I(dim_embd=512,codebook_size=1024,n_head=8,n_layers=9,connect_list=['32','64','128','256']).to(devices.device_codeformer);J=torch.load(H)['params_ema'];C.load_state_dict(J);C.eval()
+				if hasattr(D,'device'):D.device=devices.device_codeformer
+				F=G(1,face_size=512,crop_ratio=(1,1),det_model='retinaface_resnet50',save_ext='png',use_parse=B,device=devices.device_codeformer);A.net=C;A.face_helper=F;return C,F
+			def send_model_to(A,device):B=device;A.net.to(B);A.face_helper.face_det.to(B);A.face_helper.face_parse.to(B)
+			def restore(A,np_image,w=_A):
+				D=np_image;D=D[:,:,::-1];G=D.shape[0:2];A.create_models()
+				if A.net is _A or A.face_helper is _A:return D
+				A.send_model_to(devices.device_codeformer);A.face_helper.clean_all();A.face_helper.read_image(D);A.face_helper.get_face_landmarks_5(only_center_face=False,resize=640,eye_dist_threshold=5);A.face_helper.align_warp_face()
+				for L in A.face_helper.cropped_faces:
+					E=K(L/255.,bgr2rgb=B,float32=B);J(E,(.5,.5,.5),(.5,.5,.5),inplace=B);E=E.unsqueeze(0).to(devices.device_codeformer)
+					try:
+						with torch.no_grad():I=A.net(E,w=w if w is not _A else shared.opts.code_former_weight,adain=B)[0];F=H(I,rgb2bgr=B,min_max=(-1,1))
+						del I;devices.torch_gc()
+					except Exception:errors.report('Failed inference for CodeFormer',exc_info=B);F=H(E,rgb2bgr=B,min_max=(-1,1))
+					F=F.astype('uint8');A.face_helper.add_restored_face(F)
+				A.face_helper.get_inverse_affine(_A);C=A.face_helper.paste_faces_to_input_image();C=C[:,:,::-1]
+				if G!=C.shape[0:2]:C=cv2.resize(C,(0,0),fx=G[1]/C.shape[1],fy=G[0]/C.shape[0],interpolation=cv2.INTER_LINEAR)
+				A.face_helper.clean_all()
+				if shared.opts.face_restoration_unload:A.send_model_to(devices.cpu)
+				return C
+		global codeformer;codeformer=F(dirname);shared.face_restorers.append(codeformer)
+	except Exception:errors.report('Error setting up CodeFormer',exc_info=B)

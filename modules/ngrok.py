@@ -1,30 +1,11 @@
 import ngrok
-
-# Connect to ngrok for ingress
-def connect(token, port, options):
-    account = None
-    if token is None:
-        token = 'None'
-    else:
-        if ':' in token:
-            # token = authtoken:username:password
-            token, username, password = token.split(':', 2)
-            account = f"{username}:{password}"
-
-    # For all options see: https://github.com/ngrok/ngrok-py/blob/main/examples/ngrok-connect-full.py
-    if not options.get('authtoken_from_env'):
-        options['authtoken'] = token
-    if account:
-        options['basic_auth'] = account
-    if not options.get('session_metadata'):
-        options['session_metadata'] = 'standard-demo-we'
-
-
-    try:
-        public_url = ngrok.connect(f"127.0.0.1:{port}", **options).url()
-    except Exception as e:
-        print(f'Invalid ngrok authtoken? ngrok connection aborted due to: {e}\n'
-              f'Your token: {token}, get the right one on https://dashboard.ngrok.com/get-started/your-authtoken')
-    else:
-        print(f'ngrok connected to localhost:{port}! URL: {public_url}\n'
-               'You can use this link after the launch is complete.')
+def connect(token,port,options):
+	D='session_metadata';B=options;A=token;C=None
+	if A is None:A='None'
+	elif':'in A:A,E,F=A.split(':',2);C=f"{E}:{F}"
+	if not B.get('authtoken_from_env'):B['authtoken']=A
+	if C:B['basic_auth']=C
+	if not B.get(D):B[D]='standard-demo-we'
+	try:G=ngrok.connect(f"127.0.0.1:{port}",**B).url()
+	except Exception as H:print(f"Invalid ngrok authtoken? ngrok connection aborted due to: {H}\nYour token: {A}, get the right one on https://dashboard.ngrok.com/get-started/your-authtoken")
+	else:print(f"ngrok connected to localhost:{port}! URL: {G}\nYou can use this link after the launch is complete.")

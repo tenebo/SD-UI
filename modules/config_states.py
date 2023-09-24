@@ -1,199 +1,75 @@
-"""
-Supports saving and restoring webui and extensions from a known working set of commits
-"""
-
-import os
-import json
-import time
-import tqdm
-
+'\nSupports saving and restoring webui and extensions from a known working set of commits\n'
+_J='enabled'
+_I='branch'
+_H='commit_date'
+_G='remote'
+_F='extensions'
+_E='webui'
+_D='created_at'
+_C='commit_hash'
+_B=None
+_A=True
+import os,json,time,tqdm
 from datetime import datetime
 import git
-
-from modules import shared, extensions, errors
-from modules.paths_internal import script_path, config_states_dir
-
-all_config_states = {}
-
-
+from modules import shared,extensions,errors
+from modules.paths_internal import script_path,config_states_dir
+all_config_states={}
 def list_config_states():
-    global all_config_states
-
-    all_config_states.clear()
-    os.makedirs(config_states_dir, exist_ok=True)
-
-    config_states = []
-    for filename in os.listdir(config_states_dir):
-        if filename.endswith(".json"):
-            path = os.path.join(config_states_dir, filename)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    j = json.load(f)
-                    assert "created_at" in j, '"created_at" does not exist'
-                    j["filepath"] = path
-                    config_states.append(j)
-            except Exception as e:
-                print(f'[ERROR]: Config states {path}, {e}')
-
-    config_states = sorted(config_states, key=lambda cs: cs["created_at"], reverse=True)
-
-    for cs in config_states:
-        timestamp = time.asctime(time.gmtime(cs["created_at"]))
-        name = cs.get("name", "Config")
-        full_name = f"{name}: {timestamp}"
-        all_config_states[full_name] = cs
-
-    return all_config_states
-
-
+	global all_config_states;all_config_states.clear();os.makedirs(config_states_dir,exist_ok=_A);A=[]
+	for E in os.listdir(config_states_dir):
+		if E.endswith('.json'):
+			B=os.path.join(config_states_dir,E)
+			try:
+				with open(B,'r',encoding='utf-8')as F:C=json.load(F);assert _D in C,'"created_at" does not exist';C['filepath']=B;A.append(C)
+			except Exception as G:print(f"[ERROR]: Config states {B}, {G}")
+	A=sorted(A,key=lambda cs:cs[_D],reverse=_A)
+	for D in A:H=time.asctime(time.gmtime(D[_D]));I=D.get('name','Config');J=f"{I}: {H}";all_config_states[J]=D
+	return all_config_states
 def get_webui_config():
-    webui_repo = None
-
-    try:
-        if os.path.exists(os.path.join(script_path, ".git")):
-            webui_repo = git.Repo(script_path)
-    except Exception:
-        errors.report(f"Error reading webui git info from {script_path}", exc_info=True)
-
-    webui_remote = None
-    webui_commit_hash = None
-    webui_commit_date = None
-    webui_branch = None
-    if webui_repo and not webui_repo.bare:
-        try:
-            webui_remote = next(webui_repo.remote().urls, None)
-            head = webui_repo.head.commit
-            webui_commit_date = webui_repo.head.commit.committed_date
-            webui_commit_hash = head.hexsha
-            webui_branch = webui_repo.active_branch.name
-
-        except Exception:
-            webui_remote = None
-
-    return {
-        "remote": webui_remote,
-        "commit_hash": webui_commit_hash,
-        "commit_date": webui_commit_date,
-        "branch": webui_branch,
-    }
-
-
+	A=_B
+	try:
+		if os.path.exists(os.path.join(script_path,'.git')):A=git.Repo(script_path)
+	except Exception:errors.report(f"Error reading webui git info from {script_path}",exc_info=_A)
+	B=_B;C=_B;D=_B;E=_B
+	if A and not A.bare:
+		try:B=next(A.remote().urls,_B);F=A.head.commit;D=A.head.commit.committed_date;C=F.hexsha;E=A.active_branch.name
+		except Exception:B=_B
+	return{_G:B,_C:C,_H:D,_I:E}
 def get_extension_config():
-    ext_config = {}
-
-    for ext in extensions.extensions:
-        ext.read_info_from_repo()
-
-        entry = {
-            "name": ext.name,
-            "path": ext.path,
-            "enabled": ext.enabled,
-            "is_builtin": ext.is_builtin,
-            "remote": ext.remote,
-            "commit_hash": ext.commit_hash,
-            "commit_date": ext.commit_date,
-            "branch": ext.branch,
-            "have_info_from_repo": ext.have_info_from_repo
-        }
-
-        ext_config[ext.name] = entry
-
-    return ext_config
-
-
-def get_config():
-    creation_time = datetime.now().timestamp()
-    webui_config = get_webui_config()
-    ext_config = get_extension_config()
-
-    return {
-        "created_at": creation_time,
-        "webui": webui_config,
-        "extensions": ext_config
-    }
-
-
+	B={}
+	for A in extensions.extensions:A.read_info_from_repo();C={'name':A.name,'path':A.path,_J:A.enabled,'is_builtin':A.is_builtin,_G:A.remote,_C:A.commit_hash,_H:A.commit_date,_I:A.branch,'have_info_from_repo':A.have_info_from_repo};B[A.name]=C
+	return B
+def get_config():A=datetime.now().timestamp();B=get_webui_config();C=get_extension_config();return{_D:A,_E:B,_F:C}
 def restore_webui_config(config):
-    print("* Restoring webui state...")
-
-    if "webui" not in config:
-        print("Error: No webui data saved to config")
-        return
-
-    webui_config = config["webui"]
-
-    if "commit_hash" not in webui_config:
-        print("Error: No commit saved to webui config")
-        return
-
-    webui_commit_hash = webui_config.get("commit_hash", None)
-    webui_repo = None
-
-    try:
-        if os.path.exists(os.path.join(script_path, ".git")):
-            webui_repo = git.Repo(script_path)
-    except Exception:
-        errors.report(f"Error reading webui git info from {script_path}", exc_info=True)
-        return
-
-    try:
-        webui_repo.git.fetch(all=True)
-        webui_repo.git.reset(webui_commit_hash, hard=True)
-        print(f"* Restored webui to commit {webui_commit_hash}.")
-    except Exception:
-        errors.report(f"Error restoring webui to commit{webui_commit_hash}")
-
-
+	C=config;print('* Restoring webui state...')
+	if _E not in C:print('Error: No webui data saved to config');return
+	D=C[_E]
+	if _C not in D:print('Error: No commit saved to webui config');return
+	A=D.get(_C,_B);B=_B
+	try:
+		if os.path.exists(os.path.join(script_path,'.git')):B=git.Repo(script_path)
+	except Exception:errors.report(f"Error reading webui git info from {script_path}",exc_info=_A);return
+	try:B.git.fetch(all=_A);B.git.reset(A,hard=_A);print(f"* Restored webui to commit {A}.")
+	except Exception:errors.report(f"Error restoring webui to commit{A}")
 def restore_extension_config(config):
-    print("* Restoring extension state...")
-
-    if "extensions" not in config:
-        print("Error: No extension data saved to config")
-        return
-
-    ext_config = config["extensions"]
-
-    results = []
-    disabled = []
-
-    for ext in tqdm.tqdm(extensions.extensions):
-        if ext.is_builtin:
-            continue
-
-        ext.read_info_from_repo()
-        current_commit = ext.commit_hash
-
-        if ext.name not in ext_config:
-            ext.disabled = True
-            disabled.append(ext.name)
-            results.append((ext, current_commit[:8], False, "Saved extension state not found in config, marking as disabled"))
-            continue
-
-        entry = ext_config[ext.name]
-
-        if "commit_hash" in entry and entry["commit_hash"]:
-            try:
-                ext.fetch_and_reset_hard(entry["commit_hash"])
-                ext.read_info_from_repo()
-                if current_commit != entry["commit_hash"]:
-                    results.append((ext, current_commit[:8], True, entry["commit_hash"][:8]))
-            except Exception as ex:
-                results.append((ext, current_commit[:8], False, ex))
-        else:
-            results.append((ext, current_commit[:8], False, "No commit hash found in config"))
-
-        if not entry.get("enabled", False):
-            ext.disabled = True
-            disabled.append(ext.name)
-        else:
-            ext.disabled = False
-
-    shared.opts.disabled_extensions = disabled
-    shared.opts.save(shared.config_filename)
-
-    print("* Finished restoring extensions. Results:")
-    for ext, prev_commit, success, result in results:
-        if success:
-            print(f"  + {ext.name}: {prev_commit} -> {result}")
-        else:
-            print(f"  ! {ext.name}: FAILURE ({result})")
+	G=config;E=False;print('* Restoring extension state...')
+	if _F not in G:print('Error: No extension data saved to config');return
+	H=G[_F];C=[];F=[]
+	for A in tqdm.tqdm(extensions.extensions):
+		if A.is_builtin:continue
+		A.read_info_from_repo();D=A.commit_hash
+		if A.name not in H:A.disabled=_A;F.append(A.name);C.append((A,D[:8],E,'Saved extension state not found in config, marking as disabled'));continue
+		B=H[A.name]
+		if _C in B and B[_C]:
+			try:
+				A.fetch_and_reset_hard(B[_C]);A.read_info_from_repo()
+				if D!=B[_C]:C.append((A,D[:8],_A,B[_C][:8]))
+			except Exception as J:C.append((A,D[:8],E,J))
+		else:C.append((A,D[:8],E,'No commit hash found in config'))
+		if not B.get(_J,E):A.disabled=_A;F.append(A.name)
+		else:A.disabled=E
+	shared.opts.disabled_extensions=F;shared.opts.save(shared.config_filename);print('* Finished restoring extensions. Results:')
+	for(A,K,L,I)in C:
+		if L:print(f"  + {A.name}: {K} -> {I}")
+		else:print(f"  ! {A.name}: FAILURE ({I})")

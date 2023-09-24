@@ -1,571 +1,218 @@
-import logging
-import os
-import re
-
-import lora_patches
-import network
-import network_lora
-import network_hada
-import network_ia3
-import network_lokr
-import network_full
-import network_norm
-
-import torch
+_F='network_layer_name'
+_E='network_bias_backup'
+_D='network_weights_backup'
+_C='attentions'
+_B=True
+_A=None
+import logging,os,re,lora_patches,network,network_lora,network_hada,network_ia3,network_lokr,network_full,network_norm,torch
 from typing import Union
-
-from modules import shared, devices, sd_models, errors, scripts, sd_hijack
-
-module_types = [
-    network_lora.ModuleTypeLora(),
-    network_hada.ModuleTypeHada(),
-    network_ia3.ModuleTypeIa3(),
-    network_lokr.ModuleTypeLokr(),
-    network_full.ModuleTypeFull(),
-    network_norm.ModuleTypeNorm(),
-]
-
-
-re_digits = re.compile(r"\d+")
-re_x_proj = re.compile(r"(.*)_([qkv]_proj)$")
-re_compiled = {}
-
-suffix_conversion = {
-    "attentions": {},
-    "resnets": {
-        "conv1": "in_layers_2",
-        "conv2": "out_layers_3",
-        "norm1": "in_layers_0",
-        "norm2": "out_layers_0",
-        "time_emb_proj": "emb_layers_1",
-        "conv_shortcut": "skip_connection",
-    }
-}
-
-
-def convert_diffusers_name_to_compvis(key, is_sd2):
-    def match(match_list, regex_text):
-        regex = re_compiled.get(regex_text)
-        if regex is None:
-            regex = re.compile(regex_text)
-            re_compiled[regex_text] = regex
-
-        r = re.match(regex, key)
-        if not r:
-            return False
-
-        match_list.clear()
-        match_list.extend([int(x) if re.match(re_digits, x) else x for x in r.groups()])
-        return True
-
-    m = []
-
-    if match(m, r"lora_unet_conv_in(.*)"):
-        return f'diffusion_model_input_blocks_0_0{m[0]}'
-
-    if match(m, r"lora_unet_conv_out(.*)"):
-        return f'diffusion_model_out_2{m[0]}'
-
-    if match(m, r"lora_unet_time_embedding_linear_(\d+)(.*)"):
-        return f"diffusion_model_time_embed_{m[0] * 2 - 2}{m[1]}"
-
-    if match(m, r"lora_unet_down_blocks_(\d+)_(attentions|resnets)_(\d+)_(.+)"):
-        suffix = suffix_conversion.get(m[1], {}).get(m[3], m[3])
-        return f"diffusion_model_input_blocks_{1 + m[0] * 3 + m[2]}_{1 if m[1] == 'attentions' else 0}_{suffix}"
-
-    if match(m, r"lora_unet_mid_block_(attentions|resnets)_(\d+)_(.+)"):
-        suffix = suffix_conversion.get(m[0], {}).get(m[2], m[2])
-        return f"diffusion_model_middle_block_{1 if m[0] == 'attentions' else m[1] * 2}_{suffix}"
-
-    if match(m, r"lora_unet_up_blocks_(\d+)_(attentions|resnets)_(\d+)_(.+)"):
-        suffix = suffix_conversion.get(m[1], {}).get(m[3], m[3])
-        return f"diffusion_model_output_blocks_{m[0] * 3 + m[2]}_{1 if m[1] == 'attentions' else 0}_{suffix}"
-
-    if match(m, r"lora_unet_down_blocks_(\d+)_downsamplers_0_conv"):
-        return f"diffusion_model_input_blocks_{3 + m[0] * 3}_0_op"
-
-    if match(m, r"lora_unet_up_blocks_(\d+)_upsamplers_0_conv"):
-        return f"diffusion_model_output_blocks_{2 + m[0] * 3}_{2 if m[0]>0 else 1}_conv"
-
-    if match(m, r"lora_te_text_model_encoder_layers_(\d+)_(.+)"):
-        if is_sd2:
-            if 'mlp_fc1' in m[1]:
-                return f"model_transformer_resblocks_{m[0]}_{m[1].replace('mlp_fc1', 'mlp_c_fc')}"
-            elif 'mlp_fc2' in m[1]:
-                return f"model_transformer_resblocks_{m[0]}_{m[1].replace('mlp_fc2', 'mlp_c_proj')}"
-            else:
-                return f"model_transformer_resblocks_{m[0]}_{m[1].replace('self_attn', 'attn')}"
-
-        return f"transformer_text_model_encoder_layers_{m[0]}_{m[1]}"
-
-    if match(m, r"lora_te2_text_model_encoder_layers_(\d+)_(.+)"):
-        if 'mlp_fc1' in m[1]:
-            return f"1_model_transformer_resblocks_{m[0]}_{m[1].replace('mlp_fc1', 'mlp_c_fc')}"
-        elif 'mlp_fc2' in m[1]:
-            return f"1_model_transformer_resblocks_{m[0]}_{m[1].replace('mlp_fc2', 'mlp_c_proj')}"
-        else:
-            return f"1_model_transformer_resblocks_{m[0]}_{m[1].replace('self_attn', 'attn')}"
-
-    return key
-
-
+from modules import shared,devices,sd_models,errors,scripts,sd_hijack
+module_types=[network_lora.ModuleTypeLora(),network_hada.ModuleTypeHada(),network_ia3.ModuleTypeIa3(),network_lokr.ModuleTypeLokr(),network_full.ModuleTypeFull(),network_norm.ModuleTypeNorm()]
+re_digits=re.compile('\\d+')
+re_x_proj=re.compile('(.*)_([qkv]_proj)$')
+re_compiled={}
+suffix_conversion={_C:{},'resnets':{'conv1':'in_layers_2','conv2':'out_layers_3','norm1':'in_layers_0','norm2':'out_layers_0','time_emb_proj':'emb_layers_1','conv_shortcut':'skip_connection'}}
+def convert_diffusers_name_to_compvis(key,is_sd2):
+	I='attn';H='self_attn';G='mlp_c_proj';F='mlp_c_fc';E='mlp_fc2';D='mlp_fc1'
+	def B(match_list,regex_text):
+		C=match_list;B=regex_text;A=re_compiled.get(B)
+		if A is _A:A=re.compile(B);re_compiled[B]=A
+		D=re.match(A,key)
+		if not D:return False
+		C.clear();C.extend([int(A)if re.match(re_digits,A)else A for A in D.groups()]);return _B
+	A=[]
+	if B(A,'lora_unet_conv_in(.*)'):return f"diffusion_model_input_blocks_0_0{A[0]}"
+	if B(A,'lora_unet_conv_out(.*)'):return f"diffusion_model_out_2{A[0]}"
+	if B(A,'lora_unet_time_embedding_linear_(\\d+)(.*)'):return f"diffusion_model_time_embed_{A[0]*2-2}{A[1]}"
+	if B(A,'lora_unet_down_blocks_(\\d+)_(attentions|resnets)_(\\d+)_(.+)'):C=suffix_conversion.get(A[1],{}).get(A[3],A[3]);return f"diffusion_model_input_blocks_{1+A[0]*3+A[2]}_{1 if A[1]==_C else 0}_{C}"
+	if B(A,'lora_unet_mid_block_(attentions|resnets)_(\\d+)_(.+)'):C=suffix_conversion.get(A[0],{}).get(A[2],A[2]);return f"diffusion_model_middle_block_{1 if A[0]==_C else A[1]*2}_{C}"
+	if B(A,'lora_unet_up_blocks_(\\d+)_(attentions|resnets)_(\\d+)_(.+)'):C=suffix_conversion.get(A[1],{}).get(A[3],A[3]);return f"diffusion_model_output_blocks_{A[0]*3+A[2]}_{1 if A[1]==_C else 0}_{C}"
+	if B(A,'lora_unet_down_blocks_(\\d+)_downsamplers_0_conv'):return f"diffusion_model_input_blocks_{3+A[0]*3}_0_op"
+	if B(A,'lora_unet_up_blocks_(\\d+)_upsamplers_0_conv'):return f"diffusion_model_output_blocks_{2+A[0]*3}_{2 if A[0]>0 else 1}_conv"
+	if B(A,'lora_te_text_model_encoder_layers_(\\d+)_(.+)'):
+		if is_sd2:
+			if D in A[1]:return f"model_transformer_resblocks_{A[0]}_{A[1].replace(D,F)}"
+			elif E in A[1]:return f"model_transformer_resblocks_{A[0]}_{A[1].replace(E,G)}"
+			else:return f"model_transformer_resblocks_{A[0]}_{A[1].replace(H,I)}"
+		return f"transformer_text_model_encoder_layers_{A[0]}_{A[1]}"
+	if B(A,'lora_te2_text_model_encoder_layers_(\\d+)_(.+)'):
+		if D in A[1]:return f"1_model_transformer_resblocks_{A[0]}_{A[1].replace(D,F)}"
+		elif E in A[1]:return f"1_model_transformer_resblocks_{A[0]}_{A[1].replace(E,G)}"
+		else:return f"1_model_transformer_resblocks_{A[0]}_{A[1].replace(H,I)}"
+	return key
 def assign_network_names_to_compvis_modules(sd_model):
-    network_layer_mapping = {}
-
-    if shared.sd_model.is_sdxl:
-        for i, embedder in enumerate(shared.sd_model.conditioner.embedders):
-            if not hasattr(embedder, 'wrapped'):
-                continue
-
-            for name, module in embedder.wrapped.named_modules():
-                network_name = f'{i}_{name.replace(".", "_")}'
-                network_layer_mapping[network_name] = module
-                module.network_layer_name = network_name
-    else:
-        for name, module in shared.sd_model.cond_stage_model.wrapped.named_modules():
-            network_name = name.replace(".", "_")
-            network_layer_mapping[network_name] = module
-            module.network_layer_name = network_name
-
-    for name, module in shared.sd_model.model.named_modules():
-        network_name = name.replace(".", "_")
-        network_layer_mapping[network_name] = module
-        module.network_layer_name = network_name
-
-    sd_model.network_layer_mapping = network_layer_mapping
-
-
-def load_network(name, network_on_disk):
-    net = network.Network(name, network_on_disk)
-    net.mtime = os.path.getmtime(network_on_disk.filename)
-
-    sd = sd_models.read_state_dict(network_on_disk.filename)
-
-    # this should not be needed but is here as an emergency fix for an unknown error people are experiencing in 1.2.0
-    if not hasattr(shared.sd_model, 'network_layer_mapping'):
-        assign_network_names_to_compvis_modules(shared.sd_model)
-
-    keys_failed_to_match = {}
-    is_sd2 = 'model_transformer_resblocks' in shared.sd_model.network_layer_mapping
-
-    matched_networks = {}
-
-    for key_network, weight in sd.items():
-        key_network_without_network_parts, network_part = key_network.split(".", 1)
-
-        key = convert_diffusers_name_to_compvis(key_network_without_network_parts, is_sd2)
-        sd_module = shared.sd_model.network_layer_mapping.get(key, None)
-
-        if sd_module is None:
-            m = re_x_proj.match(key)
-            if m:
-                sd_module = shared.sd_model.network_layer_mapping.get(m.group(1), None)
-
-        # SDXL loras seem to already have correct compvis keys, so only need to replace "lora_unet" with "diffusion_model"
-        if sd_module is None and "lora_unet" in key_network_without_network_parts:
-            key = key_network_without_network_parts.replace("lora_unet", "diffusion_model")
-            sd_module = shared.sd_model.network_layer_mapping.get(key, None)
-        elif sd_module is None and "lora_te1_text_model" in key_network_without_network_parts:
-            key = key_network_without_network_parts.replace("lora_te1_text_model", "0_transformer_text_model")
-            sd_module = shared.sd_model.network_layer_mapping.get(key, None)
-
-            # some SD1 Loras also have correct compvis keys
-            if sd_module is None:
-                key = key_network_without_network_parts.replace("lora_te1_text_model", "transformer_text_model")
-                sd_module = shared.sd_model.network_layer_mapping.get(key, None)
-
-        if sd_module is None:
-            keys_failed_to_match[key_network] = key
-            continue
-
-        if key not in matched_networks:
-            matched_networks[key] = network.NetworkWeights(network_key=key_network, sd_key=key, w={}, sd_module=sd_module)
-
-        matched_networks[key].w[network_part] = weight
-
-    for key, weights in matched_networks.items():
-        net_module = None
-        for nettype in module_types:
-            net_module = nettype.create_module(net, weights)
-            if net_module is not None:
-                break
-
-        if net_module is None:
-            raise AssertionError(f"Could not find a module type (out of {', '.join([x.__class__.__name__ for x in module_types])}) that would accept those keys: {', '.join(weights.w)}")
-
-        net.modules[key] = net_module
-
-    if keys_failed_to_match:
-        logging.debug(f"Network {network_on_disk.filename} didn't match keys: {keys_failed_to_match}")
-
-    return net
-
-
+	E='_';D={}
+	if shared.sd_model.is_sdxl:
+		for(G,F)in enumerate(shared.sd_model.conditioner.embedders):
+			if not hasattr(F,'wrapped'):continue
+			for(C,A)in F.wrapped.named_modules():B=f"{G}_{C.replace('.',E)}";D[B]=A;A.network_layer_name=B
+	else:
+		for(C,A)in shared.sd_model.cond_stage_model.wrapped.named_modules():B=C.replace('.',E);D[B]=A;A.network_layer_name=B
+	for(C,A)in shared.sd_model.model.named_modules():B=C.replace('.',E);D[B]=A;A.network_layer_name=B
+	sd_model.network_layer_mapping=D
+def load_network(name,network_on_disk):
+	M='lora_unet';J='lora_te1_text_model';D=network_on_disk;E=network.Network(name,D);E.mtime=os.path.getmtime(D.filename);N=sd_models.read_state_dict(D.filename)
+	if not hasattr(shared.sd_model,'network_layer_mapping'):assign_network_names_to_compvis_modules(shared.sd_model)
+	H={};O='model_transformer_resblocks'in shared.sd_model.network_layer_mapping;F={}
+	for(I,P)in N.items():
+		C,Q=I.split('.',1);A=convert_diffusers_name_to_compvis(C,O);B=shared.sd_model.network_layer_mapping.get(A,_A)
+		if B is _A:
+			K=re_x_proj.match(A)
+			if K:B=shared.sd_model.network_layer_mapping.get(K.group(1),_A)
+		if B is _A and M in C:A=C.replace(M,'diffusion_model');B=shared.sd_model.network_layer_mapping.get(A,_A)
+		elif B is _A and J in C:
+			A=C.replace(J,'0_transformer_text_model');B=shared.sd_model.network_layer_mapping.get(A,_A)
+			if B is _A:A=C.replace(J,'transformer_text_model');B=shared.sd_model.network_layer_mapping.get(A,_A)
+		if B is _A:H[I]=A;continue
+		if A not in F:F[A]=network.NetworkWeights(network_key=I,sd_key=A,w={},sd_module=B)
+		F[A].w[Q]=P
+	for(A,L)in F.items():
+		G=_A
+		for R in module_types:
+			G=R.create_module(E,L)
+			if G is not _A:break
+		if G is _A:raise AssertionError(f"Could not find a module type (out of {', '.join([A.__class__.__name__ for A in module_types])}) that would accept those keys: {', '.join(L.w)}")
+		E.modules[A]=G
+	if H:logging.debug(f"Network {D.filename} didn't match keys: {H}")
+	return E
 def purge_networks_from_memory():
-    while len(networks_in_memory) > shared.opts.lora_in_memory_limit and len(networks_in_memory) > 0:
-        name = next(iter(networks_in_memory))
-        networks_in_memory.pop(name, None)
-
-    devices.torch_gc()
-
-
-def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=None):
-    already_loaded = {}
-
-    for net in loaded_networks:
-        if net.name in names:
-            already_loaded[net.name] = net
-
-    loaded_networks.clear()
-
-    networks_on_disk = [available_network_aliases.get(name, None) for name in names]
-    if any(x is None for x in networks_on_disk):
-        list_available_networks()
-
-        networks_on_disk = [available_network_aliases.get(name, None) for name in names]
-
-    failed_to_load_networks = []
-
-    for i, (network_on_disk, name) in enumerate(zip(networks_on_disk, names)):
-        net = already_loaded.get(name, None)
-
-        if network_on_disk is not None:
-            if net is None:
-                net = networks_in_memory.get(name)
-
-            if net is None or os.path.getmtime(network_on_disk.filename) > net.mtime:
-                try:
-                    net = load_network(name, network_on_disk)
-
-                    networks_in_memory.pop(name, None)
-                    networks_in_memory[name] = net
-                except Exception as e:
-                    errors.display(e, f"loading network {network_on_disk.filename}")
-                    continue
-
-            net.mentioned_name = name
-
-            network_on_disk.read_hash()
-
-        if net is None:
-            failed_to_load_networks.append(name)
-            logging.info(f"Couldn't find network with name {name}")
-            continue
-
-        net.te_multiplier = te_multipliers[i] if te_multipliers else 1.0
-        net.unet_multiplier = unet_multipliers[i] if unet_multipliers else 1.0
-        net.dyn_dim = dyn_dims[i] if dyn_dims else 1.0
-        loaded_networks.append(net)
-
-    if failed_to_load_networks:
-        sd_hijack.model_hijack.comments.append("Networks not found: " + ", ".join(failed_to_load_networks))
-
-    purge_networks_from_memory()
-
-
-def network_restore_weights_from_backup(self: Union[torch.nn.Conv2d, torch.nn.Linear, torch.nn.GroupNorm, torch.nn.LayerNorm, torch.nn.MultiheadAttention]):
-    weights_backup = getattr(self, "network_weights_backup", None)
-    bias_backup = getattr(self, "network_bias_backup", None)
-
-    if weights_backup is None and bias_backup is None:
-        return
-
-    if weights_backup is not None:
-        if isinstance(self, torch.nn.MultiheadAttention):
-            self.in_proj_weight.copy_(weights_backup[0])
-            self.out_proj.weight.copy_(weights_backup[1])
-        else:
-            self.weight.copy_(weights_backup)
-
-    if bias_backup is not None:
-        if isinstance(self, torch.nn.MultiheadAttention):
-            self.out_proj.bias.copy_(bias_backup)
-        else:
-            self.bias.copy_(bias_backup)
-    else:
-        if isinstance(self, torch.nn.MultiheadAttention):
-            self.out_proj.bias = None
-        else:
-            self.bias = None
-
-
-def network_apply_weights(self: Union[torch.nn.Conv2d, torch.nn.Linear, torch.nn.GroupNorm, torch.nn.LayerNorm, torch.nn.MultiheadAttention]):
-    """
-    Applies the currently selected set of networks to the weights of torch layer self.
-    If weights already have this particular set of networks applied, does nothing.
-    If not, restores orginal weights from backup and alters weights according to networks.
-    """
-
-    network_layer_name = getattr(self, 'network_layer_name', None)
-    if network_layer_name is None:
-        return
-
-    current_names = getattr(self, "network_current_names", ())
-    wanted_names = tuple((x.name, x.te_multiplier, x.unet_multiplier, x.dyn_dim) for x in loaded_networks)
-
-    weights_backup = getattr(self, "network_weights_backup", None)
-    if weights_backup is None and wanted_names != ():
-        if current_names != ():
-            raise RuntimeError("no backup weights found and current weights are not unchanged")
-
-        if isinstance(self, torch.nn.MultiheadAttention):
-            weights_backup = (self.in_proj_weight.to(devices.cpu, copy=True), self.out_proj.weight.to(devices.cpu, copy=True))
-        else:
-            weights_backup = self.weight.to(devices.cpu, copy=True)
-
-        self.network_weights_backup = weights_backup
-
-    bias_backup = getattr(self, "network_bias_backup", None)
-    if bias_backup is None:
-        if isinstance(self, torch.nn.MultiheadAttention) and self.out_proj.bias is not None:
-            bias_backup = self.out_proj.bias.to(devices.cpu, copy=True)
-        elif getattr(self, 'bias', None) is not None:
-            bias_backup = self.bias.to(devices.cpu, copy=True)
-        else:
-            bias_backup = None
-        self.network_bias_backup = bias_backup
-
-    if current_names != wanted_names:
-        network_restore_weights_from_backup(self)
-
-        for net in loaded_networks:
-            module = net.modules.get(network_layer_name, None)
-            if module is not None and hasattr(self, 'weight'):
-                try:
-                    with torch.no_grad():
-                        updown, ex_bias = module.calc_updown(self.weight)
-
-                        if len(self.weight.shape) == 4 and self.weight.shape[1] == 9:
-                            # inpainting model. zero pad updown to make channel[1]  4 to 9
-                            updown = torch.nn.functional.pad(updown, (0, 0, 0, 0, 0, 5))
-
-                        self.weight += updown
-                        if ex_bias is not None and hasattr(self, 'bias'):
-                            if self.bias is None:
-                                self.bias = torch.nn.Parameter(ex_bias)
-                            else:
-                                self.bias += ex_bias
-                except RuntimeError as e:
-                    logging.debug(f"Network {net.name} layer {network_layer_name}: {e}")
-                    extra_network_lora.errors[net.name] = extra_network_lora.errors.get(net.name, 0) + 1
-
-                continue
-
-            module_q = net.modules.get(network_layer_name + "_q_proj", None)
-            module_k = net.modules.get(network_layer_name + "_k_proj", None)
-            module_v = net.modules.get(network_layer_name + "_v_proj", None)
-            module_out = net.modules.get(network_layer_name + "_out_proj", None)
-
-            if isinstance(self, torch.nn.MultiheadAttention) and module_q and module_k and module_v and module_out:
-                try:
-                    with torch.no_grad():
-                        updown_q, _ = module_q.calc_updown(self.in_proj_weight)
-                        updown_k, _ = module_k.calc_updown(self.in_proj_weight)
-                        updown_v, _ = module_v.calc_updown(self.in_proj_weight)
-                        updown_qkv = torch.vstack([updown_q, updown_k, updown_v])
-                        updown_out, ex_bias = module_out.calc_updown(self.out_proj.weight)
-
-                        self.in_proj_weight += updown_qkv
-                        self.out_proj.weight += updown_out
-                    if ex_bias is not None:
-                        if self.out_proj.bias is None:
-                            self.out_proj.bias = torch.nn.Parameter(ex_bias)
-                        else:
-                            self.out_proj.bias += ex_bias
-
-                except RuntimeError as e:
-                    logging.debug(f"Network {net.name} layer {network_layer_name}: {e}")
-                    extra_network_lora.errors[net.name] = extra_network_lora.errors.get(net.name, 0) + 1
-
-                continue
-
-            if module is None:
-                continue
-
-            logging.debug(f"Network {net.name} layer {network_layer_name}: couldn't find supported operation")
-            extra_network_lora.errors[net.name] = extra_network_lora.errors.get(net.name, 0) + 1
-
-        self.network_current_names = wanted_names
-
-
-def network_forward(module, input, original_forward):
-    """
-    Old way of applying Lora by executing operations during layer's forward.
-    Stacking many loras this way results in big performance degradation.
-    """
-
-    if len(loaded_networks) == 0:
-        return original_forward(module, input)
-
-    input = devices.cond_cast_unet(input)
-
-    network_restore_weights_from_backup(module)
-    network_reset_cached_weight(module)
-
-    y = original_forward(module, input)
-
-    network_layer_name = getattr(module, 'network_layer_name', None)
-    for lora in loaded_networks:
-        module = lora.modules.get(network_layer_name, None)
-        if module is None:
-            continue
-
-        y = module.forward(input, y)
-
-    return y
-
-
-def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
-    self.network_current_names = ()
-    self.network_weights_backup = None
-
-
-def network_Linear_forward(self, input):
-    if shared.opts.lora_functional:
-        return network_forward(self, input, originals.Linear_forward)
-
-    network_apply_weights(self)
-
-    return originals.Linear_forward(self, input)
-
-
-def network_Linear_load_state_dict(self, *args, **kwargs):
-    network_reset_cached_weight(self)
-
-    return originals.Linear_load_state_dict(self, *args, **kwargs)
-
-
-def network_Conv2d_forward(self, input):
-    if shared.opts.lora_functional:
-        return network_forward(self, input, originals.Conv2d_forward)
-
-    network_apply_weights(self)
-
-    return originals.Conv2d_forward(self, input)
-
-
-def network_Conv2d_load_state_dict(self, *args, **kwargs):
-    network_reset_cached_weight(self)
-
-    return originals.Conv2d_load_state_dict(self, *args, **kwargs)
-
-
-def network_GroupNorm_forward(self, input):
-    if shared.opts.lora_functional:
-        return network_forward(self, input, originals.GroupNorm_forward)
-
-    network_apply_weights(self)
-
-    return originals.GroupNorm_forward(self, input)
-
-
-def network_GroupNorm_load_state_dict(self, *args, **kwargs):
-    network_reset_cached_weight(self)
-
-    return originals.GroupNorm_load_state_dict(self, *args, **kwargs)
-
-
-def network_LayerNorm_forward(self, input):
-    if shared.opts.lora_functional:
-        return network_forward(self, input, originals.LayerNorm_forward)
-
-    network_apply_weights(self)
-
-    return originals.LayerNorm_forward(self, input)
-
-
-def network_LayerNorm_load_state_dict(self, *args, **kwargs):
-    network_reset_cached_weight(self)
-
-    return originals.LayerNorm_load_state_dict(self, *args, **kwargs)
-
-
-def network_MultiheadAttention_forward(self, *args, **kwargs):
-    network_apply_weights(self)
-
-    return originals.MultiheadAttention_forward(self, *args, **kwargs)
-
-
-def network_MultiheadAttention_load_state_dict(self, *args, **kwargs):
-    network_reset_cached_weight(self)
-
-    return originals.MultiheadAttention_load_state_dict(self, *args, **kwargs)
-
-
+	while len(networks_in_memory)>shared.opts.lora_in_memory_limit and len(networks_in_memory)>0:A=next(iter(networks_in_memory));networks_in_memory.pop(A,_A)
+	devices.torch_gc()
+def load_networks(names,te_multipliers=_A,unet_multipliers=_A,dyn_dims=_A):
+	K=dyn_dims;J=unet_multipliers;I=te_multipliers;H=1.;D=names;L={}
+	for A in loaded_networks:
+		if A.name in D:L[A.name]=A
+	loaded_networks.clear();E=[available_network_aliases.get(A,_A)for A in D]
+	if any(A is _A for A in E):list_available_networks();E=[available_network_aliases.get(A,_A)for A in D]
+	F=[]
+	for(G,(C,B))in enumerate(zip(E,D)):
+		A=L.get(B,_A)
+		if C is not _A:
+			if A is _A:A=networks_in_memory.get(B)
+			if A is _A or os.path.getmtime(C.filename)>A.mtime:
+				try:A=load_network(B,C);networks_in_memory.pop(B,_A);networks_in_memory[B]=A
+				except Exception as M:errors.display(M,f"loading network {C.filename}");continue
+			A.mentioned_name=B;C.read_hash()
+		if A is _A:F.append(B);logging.info(f"Couldn't find network with name {B}");continue
+		A.te_multiplier=I[G]if I else H;A.unet_multiplier=J[G]if J else H;A.dyn_dim=K[G]if K else H;loaded_networks.append(A)
+	if F:sd_hijack.model_hijack.comments.append('Networks not found: '+', '.join(F))
+	purge_networks_from_memory()
+def network_restore_weights_from_backup(self):
+	A=self;B=getattr(A,_D,_A);C=getattr(A,_E,_A)
+	if B is _A and C is _A:return
+	if B is not _A:
+		if isinstance(A,torch.nn.MultiheadAttention):A.in_proj_weight.copy_(B[0]);A.out_proj.weight.copy_(B[1])
+		else:A.weight.copy_(B)
+	if C is not _A:
+		if isinstance(A,torch.nn.MultiheadAttention):A.out_proj.bias.copy_(C)
+		else:A.bias.copy_(C)
+	elif isinstance(A,torch.nn.MultiheadAttention):A.out_proj.bias=_A
+	else:A.bias=_A
+def network_apply_weights(self):
+	'\n    Applies the currently selected set of networks to the weights of torch layer self.\n    If weights already have this particular set of networks applied, does nothing.\n    If not, restores orginal weights from backup and alters weights according to networks.\n    ';Q='bias';A=self;C=getattr(A,_F,_A)
+	if C is _A:return
+	K=getattr(A,'network_current_names',());G=tuple((A.name,A.te_multiplier,A.unet_multiplier,A.dyn_dim)for A in loaded_networks);F=getattr(A,_D,_A)
+	if F is _A and G!=():
+		if K!=():raise RuntimeError('no backup weights found and current weights are not unchanged')
+		if isinstance(A,torch.nn.MultiheadAttention):F=A.in_proj_weight.to(devices.cpu,copy=_B),A.out_proj.weight.to(devices.cpu,copy=_B)
+		else:F=A.weight.to(devices.cpu,copy=_B)
+		A.network_weights_backup=F
+	E=getattr(A,_E,_A)
+	if E is _A:
+		if isinstance(A,torch.nn.MultiheadAttention)and A.out_proj.bias is not _A:E=A.out_proj.bias.to(devices.cpu,copy=_B)
+		elif getattr(A,Q,_A)is not _A:E=A.bias.to(devices.cpu,copy=_B)
+		else:E=_A
+		A.network_bias_backup=E
+	if K!=G:
+		network_restore_weights_from_backup(A)
+		for B in loaded_networks:
+			H=B.modules.get(C,_A)
+			if H is not _A and hasattr(A,'weight'):
+				try:
+					with torch.no_grad():
+						I,D=H.calc_updown(A.weight)
+						if len(A.weight.shape)==4 and A.weight.shape[1]==9:I=torch.nn.functional.pad(I,(0,0,0,0,0,5))
+						A.weight+=I
+						if D is not _A and hasattr(A,Q):
+							if A.bias is _A:A.bias=torch.nn.Parameter(D)
+							else:A.bias+=D
+				except RuntimeError as J:logging.debug(f"Network {B.name} layer {C}: {J}");extra_network_lora.errors[B.name]=extra_network_lora.errors.get(B.name,0)+1
+				continue
+			L=B.modules.get(C+'_q_proj',_A);M=B.modules.get(C+'_k_proj',_A);N=B.modules.get(C+'_v_proj',_A);O=B.modules.get(C+'_out_proj',_A)
+			if isinstance(A,torch.nn.MultiheadAttention)and L and M and N and O:
+				try:
+					with torch.no_grad():R,P=L.calc_updown(A.in_proj_weight);S,P=M.calc_updown(A.in_proj_weight);T,P=N.calc_updown(A.in_proj_weight);U=torch.vstack([R,S,T]);V,D=O.calc_updown(A.out_proj.weight);A.in_proj_weight+=U;A.out_proj.weight+=V
+					if D is not _A:
+						if A.out_proj.bias is _A:A.out_proj.bias=torch.nn.Parameter(D)
+						else:A.out_proj.bias+=D
+				except RuntimeError as J:logging.debug(f"Network {B.name} layer {C}: {J}");extra_network_lora.errors[B.name]=extra_network_lora.errors.get(B.name,0)+1
+				continue
+			if H is _A:continue
+			logging.debug(f"Network {B.name} layer {C}: couldn't find supported operation");extra_network_lora.errors[B.name]=extra_network_lora.errors.get(B.name,0)+1
+		A.network_current_names=G
+def network_forward(module,input,original_forward):
+	"\n    Old way of applying Lora by executing operations during layer's forward.\n    Stacking many loras this way results in big performance degradation.\n    ";C=original_forward;A=module
+	if len(loaded_networks)==0:return C(A,input)
+	input=devices.cond_cast_unet(input);network_restore_weights_from_backup(A);network_reset_cached_weight(A);B=C(A,input);D=getattr(A,_F,_A)
+	for E in loaded_networks:
+		A=E.modules.get(D,_A)
+		if A is _A:continue
+		B=A.forward(input,B)
+	return B
+def network_reset_cached_weight(self):self.network_current_names=();self.network_weights_backup=_A
+def network_Linear_forward(self,input):
+	A=self
+	if shared.opts.lora_functional:return network_forward(A,input,originals.Linear_forward)
+	network_apply_weights(A);return originals.Linear_forward(A,input)
+def network_Linear_load_state_dict(self,*A,**B):network_reset_cached_weight(self);return originals.Linear_load_state_dict(self,*A,**B)
+def network_Conv2d_forward(self,input):
+	A=self
+	if shared.opts.lora_functional:return network_forward(A,input,originals.Conv2d_forward)
+	network_apply_weights(A);return originals.Conv2d_forward(A,input)
+def network_Conv2d_load_state_dict(self,*A,**B):network_reset_cached_weight(self);return originals.Conv2d_load_state_dict(self,*A,**B)
+def network_GroupNorm_forward(self,input):
+	A=self
+	if shared.opts.lora_functional:return network_forward(A,input,originals.GroupNorm_forward)
+	network_apply_weights(A);return originals.GroupNorm_forward(A,input)
+def network_GroupNorm_load_state_dict(self,*A,**B):network_reset_cached_weight(self);return originals.GroupNorm_load_state_dict(self,*A,**B)
+def network_LayerNorm_forward(self,input):
+	A=self
+	if shared.opts.lora_functional:return network_forward(A,input,originals.LayerNorm_forward)
+	network_apply_weights(A);return originals.LayerNorm_forward(A,input)
+def network_LayerNorm_load_state_dict(self,*A,**B):network_reset_cached_weight(self);return originals.LayerNorm_load_state_dict(self,*A,**B)
+def network_MultiheadAttention_forward(self,*A,**B):network_apply_weights(self);return originals.MultiheadAttention_forward(self,*A,**B)
+def network_MultiheadAttention_load_state_dict(self,*A,**B):network_reset_cached_weight(self);return originals.MultiheadAttention_load_state_dict(self,*A,**B)
 def list_available_networks():
-    available_networks.clear()
-    available_network_aliases.clear()
-    forbidden_network_aliases.clear()
-    available_network_hash_lookup.clear()
-    forbidden_network_aliases.update({"none": 1, "Addams": 1})
-
-    os.makedirs(shared.cmd_opts.lora_dir, exist_ok=True)
-
-    candidates = list(shared.walk_files(shared.cmd_opts.lora_dir, allowed_extensions=[".pt", ".ckpt", ".safetensors"]))
-    candidates += list(shared.walk_files(shared.cmd_opts.lyco_dir_backcompat, allowed_extensions=[".pt", ".ckpt", ".safetensors"]))
-    for filename in candidates:
-        if os.path.isdir(filename):
-            continue
-
-        name = os.path.splitext(os.path.basename(filename))[0]
-        try:
-            entry = network.NetworkOnDisk(name, filename)
-        except OSError:  # should catch FileNotFoundError and PermissionError etc.
-            errors.report(f"Failed to load network {name} from {filename}", exc_info=True)
-            continue
-
-        available_networks[name] = entry
-
-        if entry.alias in available_network_aliases:
-            forbidden_network_aliases[entry.alias.lower()] = 1
-
-        available_network_aliases[name] = entry
-        available_network_aliases[entry.alias] = entry
-
-
-re_network_name = re.compile(r"(.*)\s*\([0-9a-fA-F]+\)")
-
-
-def infotext_pasted(infotext, params):
-    if "AddNet Module 1" in [x[1] for x in scripts.scripts_txt2img.infotext_fields]:
-        return  # if the other extension is active, it will handle those fields, no need to do anything
-
-    added = []
-
-    for k in params:
-        if not k.startswith("AddNet Model "):
-            continue
-
-        num = k[13:]
-
-        if params.get("AddNet Module " + num) != "LoRA":
-            continue
-
-        name = params.get("AddNet Model " + num)
-        if name is None:
-            continue
-
-        m = re_network_name.match(name)
-        if m:
-            name = m.group(1)
-
-        multiplier = params.get("AddNet Weight A " + num, "1.0")
-
-        added.append(f"<lora:{name}:{multiplier}>")
-
-    if added:
-        params["Prompt"] += "\n" + "".join(added)
-
-
-originals: lora_patches.LoraPatches = None
-
-extra_network_lora = None
-
-available_networks = {}
-available_network_aliases = {}
-loaded_networks = []
-networks_in_memory = {}
-available_network_hash_lookup = {}
-forbidden_network_aliases = {}
-
+	G='.safetensors';F='.ckpt';E='.pt';available_networks.clear();available_network_aliases.clear();forbidden_network_aliases.clear();available_network_hash_lookup.clear();forbidden_network_aliases.update({'none':1,'Addams':1});os.makedirs(shared.cmd_opts.lora_dir,exist_ok=_B);D=list(shared.walk_files(shared.cmd_opts.lora_dir,allowed_extensions=[E,F,G]));D+=list(shared.walk_files(shared.cmd_opts.lyco_dir_backcompat,allowed_extensions=[E,F,G]))
+	for B in D:
+		if os.path.isdir(B):continue
+		C=os.path.splitext(os.path.basename(B))[0]
+		try:A=network.NetworkOnDisk(C,B)
+		except OSError:errors.report(f"Failed to load network {C} from {B}",exc_info=_B);continue
+		available_networks[C]=A
+		if A.alias in available_network_aliases:forbidden_network_aliases[A.alias.lower()]=1
+		available_network_aliases[C]=A;available_network_aliases[A.alias]=A
+re_network_name=re.compile('(.*)\\s*\\([0-9a-fA-F]+\\)')
+def infotext_pasted(infotext,params):
+	G='AddNet Model ';A=params
+	if'AddNet Module 1'in[A[1]for A in scripts.scripts_txt2img.infotext_fields]:return
+	C=[]
+	for E in A:
+		if not E.startswith(G):continue
+		D=E[13:]
+		if A.get('AddNet Module '+D)!='LoRA':continue
+		B=A.get(G+D)
+		if B is _A:continue
+		F=re_network_name.match(B)
+		if F:B=F.group(1)
+		H=A.get('AddNet Weight A '+D,'1.0');C.append(f"<lora:{B}:{H}>")
+	if C:A['Prompt']+='\n'+''.join(C)
+originals=_A
+extra_network_lora=_A
+available_networks={}
+available_network_aliases={}
+loaded_networks=[]
+networks_in_memory={}
+available_network_hash_lookup={}
+forbidden_network_aliases={}
 list_available_networks()

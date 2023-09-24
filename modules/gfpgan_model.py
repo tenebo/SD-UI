@@ -1,110 +1,42 @@
-import os
-
-import facexlib
-import gfpgan
-
-import modules.face_restoration
-from modules import paths, shared, devices, modelloader, errors
-
-model_dir = "GFPGAN"
-user_path = None
-model_path = os.path.join(paths.models_path, model_dir)
-model_url = "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth"
-have_gfpgan = False
-loaded_gfpgan_model = None
-
-
+_D=False
+_C='GFPGAN'
+_B=True
+_A=None
+import os,facexlib,gfpgan,modules.face_restoration
+from modules import paths,shared,devices,modelloader,errors
+model_dir=_C
+user_path=_A
+model_path=os.path.join(paths.models_path,model_dir)
+model_url='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth'
+have_gfpgan=_D
+loaded_gfpgan_model=_A
 def gfpgann():
-    global loaded_gfpgan_model
-    global model_path
-    if loaded_gfpgan_model is not None:
-        loaded_gfpgan_model.gfpgan.to(devices.device_gfpgan)
-        return loaded_gfpgan_model
-
-    if gfpgan_constructor is None:
-        return None
-
-    models = modelloader.load_models(model_path, model_url, user_path, ext_filter="GFPGAN")
-    if len(models) == 1 and models[0].startswith("http"):
-        model_file = models[0]
-    elif len(models) != 0:
-        latest_file = max(models, key=os.path.getctime)
-        model_file = latest_file
-    else:
-        print("Unable to load gfpgan model!")
-        return None
-    if hasattr(facexlib.detection.retinaface, 'device'):
-        facexlib.detection.retinaface.device = devices.device_gfpgan
-    model = gfpgan_constructor(model_path=model_file, upscale=1, arch='clean', channel_multiplier=2, bg_upsampler=None, device=devices.device_gfpgan)
-    loaded_gfpgan_model = model
-
-    return model
-
-
-def send_model_to(model, device):
-    model.gfpgan.to(device)
-    model.face_helper.face_det.to(device)
-    model.face_helper.face_parse.to(device)
-
-
+	global loaded_gfpgan_model;global model_path
+	if loaded_gfpgan_model is not _A:loaded_gfpgan_model.gfpgan.to(devices.device_gfpgan);return loaded_gfpgan_model
+	if gfpgan_constructor is _A:return
+	A=modelloader.load_models(model_path,model_url,user_path,ext_filter=_C)
+	if len(A)==1 and A[0].startswith('http'):B=A[0]
+	elif len(A)!=0:D=max(A,key=os.path.getctime);B=D
+	else:print('Unable to load gfpgan model!');return
+	if hasattr(facexlib.detection.retinaface,'device'):facexlib.detection.retinaface.device=devices.device_gfpgan
+	C=gfpgan_constructor(model_path=B,upscale=1,arch='clean',channel_multiplier=2,bg_upsampler=_A,device=devices.device_gfpgan);loaded_gfpgan_model=C;return C
+def send_model_to(model,device):B=device;A=model;A.gfpgan.to(B);A.face_helper.face_det.to(B);A.face_helper.face_parse.to(B)
 def gfpgan_fix_faces(np_image):
-    model = gfpgann()
-    if model is None:
-        return np_image
-
-    send_model_to(model, devices.device_gfpgan)
-
-    np_image_bgr = np_image[:, :, ::-1]
-    cropped_faces, restored_faces, gfpgan_output_bgr = model.enhance(np_image_bgr, has_aligned=False, only_center_face=False, paste_back=True)
-    np_image = gfpgan_output_bgr[:, :, ::-1]
-
-    model.face_helper.clean_all()
-
-    if shared.opts.face_restoration_unload:
-        send_model_to(model, devices.cpu)
-
-    return np_image
-
-
-gfpgan_constructor = None
-
-
+	B=np_image;A=gfpgann()
+	if A is _A:return B
+	send_model_to(A,devices.device_gfpgan);C=B[:,:,::-1];E,F,D=A.enhance(C,has_aligned=_D,only_center_face=_D,paste_back=_B);B=D[:,:,::-1];A.face_helper.clean_all()
+	if shared.opts.face_restoration_unload:send_model_to(A,devices.cpu)
+	return B
+gfpgan_constructor=_A
 def setup_model(dirname):
-    try:
-        os.makedirs(model_path, exist_ok=True)
-        from gfpgan import GFPGANer
-        from facexlib import detection, parsing  # noqa: F401
-        global user_path
-        global have_gfpgan
-        global gfpgan_constructor
-
-        load_file_from_url_orig = gfpgan.utils.load_file_from_url
-        facex_load_file_from_url_orig = facexlib.detection.load_file_from_url
-        facex_load_file_from_url_orig2 = facexlib.parsing.load_file_from_url
-
-        def my_load_file_from_url(**kwargs):
-            return load_file_from_url_orig(**dict(kwargs, model_dir=model_path))
-
-        def facex_load_file_from_url(**kwargs):
-            return facex_load_file_from_url_orig(**dict(kwargs, save_dir=model_path, model_dir=None))
-
-        def facex_load_file_from_url2(**kwargs):
-            return facex_load_file_from_url_orig2(**dict(kwargs, save_dir=model_path, model_dir=None))
-
-        gfpgan.utils.load_file_from_url = my_load_file_from_url
-        facexlib.detection.load_file_from_url = facex_load_file_from_url
-        facexlib.parsing.load_file_from_url = facex_load_file_from_url2
-        user_path = dirname
-        have_gfpgan = True
-        gfpgan_constructor = GFPGANer
-
-        class FaceRestorerGFPGAN(modules.face_restoration.FaceRestoration):
-            def name(self):
-                return "GFPGAN"
-
-            def restore(self, np_image):
-                return gfpgan_fix_faces(np_image)
-
-        shared.face_restorers.append(FaceRestorerGFPGAN())
-    except Exception:
-        errors.report("Error setting up GFPGAN", exc_info=True)
+	try:
+		os.makedirs(model_path,exist_ok=_B);from gfpgan import GFPGANer as A;from facexlib import detection,parsing;global user_path;global have_gfpgan;global gfpgan_constructor;B=gfpgan.utils.load_file_from_url;C=facexlib.detection.load_file_from_url;D=facexlib.parsing.load_file_from_url
+		def E(**A):return B(**dict(A,model_dir=model_path))
+		def F(**A):return C(**dict(A,save_dir=model_path,model_dir=_A))
+		def G(**A):return D(**dict(A,save_dir=model_path,model_dir=_A))
+		gfpgan.utils.load_file_from_url=E;facexlib.detection.load_file_from_url=F;facexlib.parsing.load_file_from_url=G;user_path=dirname;have_gfpgan=_B;gfpgan_constructor=A
+		class H(modules.face_restoration.FaceRestoration):
+			def name(A):return _C
+			def restore(A,np_image):return gfpgan_fix_faces(np_image)
+		shared.face_restorers.append(H())
+	except Exception:errors.report('Error setting up GFPGAN',exc_info=_B)

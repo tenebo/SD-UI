@@ -1,340 +1,106 @@
-import cv2
-import requests
-import os
-import numpy as np
+_B=False
+_A=None
+import cv2,requests,os,numpy as np
 from PIL import ImageDraw
-
-GREEN = "#0F0"
-BLUE = "#00F"
-RED = "#F00"
-
-
-def crop_image(im, settings):
-    """ Intelligently crop an image to the subject matter """
-
-    scale_by = 1
-    if is_landscape(im.width, im.height):
-        scale_by = settings.crop_height / im.height
-    elif is_portrait(im.width, im.height):
-        scale_by = settings.crop_width / im.width
-    elif is_square(im.width, im.height):
-        if is_square(settings.crop_width, settings.crop_height):
-            scale_by = settings.crop_width / im.width
-        elif is_landscape(settings.crop_width, settings.crop_height):
-            scale_by = settings.crop_width / im.width
-        elif is_portrait(settings.crop_width, settings.crop_height):
-            scale_by = settings.crop_height / im.height
-
-
-    im = im.resize((int(im.width * scale_by), int(im.height * scale_by)))
-    im_debug = im.copy()
-
-    focus = focal_point(im_debug, settings)
-
-    # take the focal point and turn it into crop coordinates that try to center over the focal
-    # point but then get adjusted back into the frame
-    y_half = int(settings.crop_height / 2)
-    x_half = int(settings.crop_width / 2)
-
-    x1 = focus.x - x_half
-    if x1 < 0:
-        x1 = 0
-    elif x1 + settings.crop_width > im.width:
-        x1 = im.width - settings.crop_width
-
-    y1 = focus.y - y_half
-    if y1 < 0:
-        y1 = 0
-    elif y1 + settings.crop_height > im.height:
-        y1 = im.height - settings.crop_height
-
-    x2 = x1 + settings.crop_width
-    y2 = y1 + settings.crop_height
-
-    crop = [x1, y1, x2, y2]
-
-    results = []
-
-    results.append(im.crop(tuple(crop)))
-
-    if settings.annotate_image:
-        d = ImageDraw.Draw(im_debug)
-        rect = list(crop)
-        rect[2] -= 1
-        rect[3] -= 1
-        d.rectangle(rect, outline=GREEN)
-        results.append(im_debug)
-        if settings.destop_view_image:
-            im_debug.show()
-
-    return results
-
-def focal_point(im, settings):
-    corner_points = image_corner_points(im, settings) if settings.corner_points_weight > 0 else []
-    entropy_points = image_entropy_points(im, settings) if settings.entropy_points_weight > 0 else []
-    face_points = image_face_points(im, settings) if settings.face_points_weight > 0 else []
-
-    pois = []
-
-    weight_pref_total = 0
-    if corner_points:
-      weight_pref_total += settings.corner_points_weight
-    if entropy_points:
-      weight_pref_total += settings.entropy_points_weight
-    if face_points:
-      weight_pref_total += settings.face_points_weight
-
-    corner_centroid = None
-    if corner_points:
-      corner_centroid = centroid(corner_points)
-      corner_centroid.weight = settings.corner_points_weight / weight_pref_total
-      pois.append(corner_centroid)
-
-    entropy_centroid = None
-    if entropy_points:
-      entropy_centroid = centroid(entropy_points)
-      entropy_centroid.weight = settings.entropy_points_weight / weight_pref_total
-      pois.append(entropy_centroid)
-
-    face_centroid = None
-    if face_points:
-      face_centroid = centroid(face_points)
-      face_centroid.weight = settings.face_points_weight / weight_pref_total
-      pois.append(face_centroid)
-
-    average_point = poi_average(pois, settings)
-
-    if settings.annotate_image:
-      d = ImageDraw.Draw(im)
-      max_size = min(im.width, im.height) * 0.07
-      if corner_centroid is not None:
-        color = BLUE
-        box = corner_centroid.bounding(max_size * corner_centroid.weight)
-        d.text((box[0], box[1]-15), f"Edge: {corner_centroid.weight:.02f}", fill=color)
-        d.ellipse(box, outline=color)
-        if len(corner_points) > 1:
-          for f in corner_points:
-            d.rectangle(f.bounding(4), outline=color)
-      if entropy_centroid is not None:
-        color = "#ff0"
-        box = entropy_centroid.bounding(max_size * entropy_centroid.weight)
-        d.text((box[0], box[1]-15), f"Entropy: {entropy_centroid.weight:.02f}", fill=color)
-        d.ellipse(box, outline=color)
-        if len(entropy_points) > 1:
-          for f in entropy_points:
-            d.rectangle(f.bounding(4), outline=color)
-      if face_centroid is not None:
-        color = RED
-        box = face_centroid.bounding(max_size * face_centroid.weight)
-        d.text((box[0], box[1]-15), f"Face: {face_centroid.weight:.02f}", fill=color)
-        d.ellipse(box, outline=color)
-        if len(face_points) > 1:
-          for f in face_points:
-            d.rectangle(f.bounding(4), outline=color)
-
-      d.ellipse(average_point.bounding(max_size), outline=GREEN)
-
-    return average_point
-
-
-def image_face_points(im, settings):
-    if settings.dnn_model_path is not None:
-      detector = cv2.FaceDetectorYN.create(
-          settings.dnn_model_path,
-          "",
-          (im.width, im.height),
-          0.9, # score threshold
-          0.3, # nms threshold
-          5000 # keep top k before nms
-      )
-      faces = detector.detect(np.array(im))
-      results = []
-      if faces[1] is not None:
-        for face in faces[1]:
-          x = face[0]
-          y = face[1]
-          w = face[2]
-          h = face[3]
-          results.append(
-            PointOfInterest(
-              int(x + (w * 0.5)), # face focus left/right is center
-              int(y + (h * 0.33)), # face focus up/down is close to the top of the head
-              size = w,
-              weight = 1/len(faces[1])
-            )
-          )
-      return results
-    else:
-      np_im = np.array(im)
-      gray = cv2.cvtColor(np_im, cv2.COLOR_BGR2GRAY)
-
-      tries = [
-        [ f'{cv2.data.haarcascades}haarcascade_eye.xml', 0.01 ],
-        [ f'{cv2.data.haarcascades}haarcascade_frontalface_default.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_profileface.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_frontalface_alt.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_frontalface_alt_tree.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_eye_tree_eyeglasses.xml', 0.05 ],
-        [ f'{cv2.data.haarcascades}haarcascade_upperbody.xml', 0.05 ]
-      ]
-      for t in tries:
-        classifier = cv2.CascadeClassifier(t[0])
-        minsize = int(min(im.width, im.height) * t[1]) # at least N percent of the smallest side
-        try:
-          faces = classifier.detectMultiScale(gray, scaleFactor=1.1,
-            minNeighbors=7, minSize=(minsize, minsize), flags=cv2.CASCADE_SCALE_IMAGE)
-        except Exception:
-          continue
-
-        if faces:
-          rects = [[f[0], f[1], f[0] + f[2], f[1] + f[3]] for f in faces]
-          return [PointOfInterest((r[0] +r[2]) // 2, (r[1] + r[3]) // 2, size=abs(r[0]-r[2]), weight=1/len(rects)) for r in rects]
-    return []
-
-
-def image_corner_points(im, settings):
-    grayscale = im.convert("L")
-
-    # naive attempt at preventing focal points from collecting at watermarks near the bottom
-    gd = ImageDraw.Draw(grayscale)
-    gd.rectangle([0, im.height*.9, im.width, im.height], fill="#999")
-
-    np_im = np.array(grayscale)
-
-    points = cv2.goodFeaturesToTrack(
-        np_im,
-        maxCorners=100,
-        qualityLevel=0.04,
-        minDistance=min(grayscale.width, grayscale.height)*0.06,
-        useHarrisDetector=False,
-    )
-
-    if points is None:
-        return []
-
-    focal_points = []
-    for point in points:
-      x, y = point.ravel()
-      focal_points.append(PointOfInterest(x, y, size=4, weight=1/len(points)))
-
-    return focal_points
-
-
-def image_entropy_points(im, settings):
-    landscape = im.height < im.width
-    portrait = im.height > im.width
-    if landscape:
-      move_idx = [0, 2]
-      move_max = im.size[0]
-    elif portrait:
-      move_idx = [1, 3]
-      move_max = im.size[1]
-    else:
-      return []
-
-    e_max = 0
-    crop_current = [0, 0, settings.crop_width, settings.crop_height]
-    crop_best = crop_current
-    while crop_current[move_idx[1]] < move_max:
-        crop = im.crop(tuple(crop_current))
-        e = image_entropy(crop)
-
-        if (e > e_max):
-          e_max = e
-          crop_best = list(crop_current)
-
-        crop_current[move_idx[0]] += 4
-        crop_current[move_idx[1]] += 4
-
-    x_mid = int(crop_best[0] + settings.crop_width/2)
-    y_mid = int(crop_best[1] + settings.crop_height/2)
-
-    return [PointOfInterest(x_mid, y_mid, size=25, weight=1.0)]
-
-
-def image_entropy(im):
-    # greyscale image entropy
-    # band = np.asarray(im.convert("L"))
-    band = np.asarray(im.convert("1"), dtype=np.uint8)
-    hist, _ = np.histogram(band, bins=range(0, 256))
-    hist = hist[hist > 0]
-    return -np.log2(hist / hist.sum()).sum()
-
-
-def centroid(pois):
-    x = [poi.x for poi in pois]
-    y = [poi.y for poi in pois]
-    return PointOfInterest(sum(x) / len(pois), sum(y) / len(pois))
-
-
-def poi_average(pois, settings):
-    weight = 0.0
-    x = 0.0
-    y = 0.0
-    for poi in pois:
-        weight += poi.weight
-        x += poi.x * poi.weight
-        y += poi.y * poi.weight
-    avg_x = round(weight and x / weight)
-    avg_y = round(weight and y / weight)
-
-    return PointOfInterest(avg_x, avg_y)
-
-
-def is_landscape(w, h):
-    return w > h
-
-
-def is_portrait(w, h):
-    return h > w
-
-
-def is_square(w, h):
-    return w == h
-
-
+GREEN='#0F0'
+BLUE='#00F'
+RED='#F00'
+def crop_image(im,settings):
+	' Intelligently crop an image to the subject matter ';B=im;A=settings;C=1
+	if is_landscape(B.width,B.height):C=A.crop_height/B.height
+	elif is_portrait(B.width,B.height):C=A.crop_width/B.width
+	elif is_square(B.width,B.height):
+		if is_square(A.crop_width,A.crop_height):C=A.crop_width/B.width
+		elif is_landscape(A.crop_width,A.crop_height):C=A.crop_width/B.width
+		elif is_portrait(A.crop_width,A.crop_height):C=A.crop_height/B.height
+	B=B.resize((int(B.width*C),int(B.height*C)));F=B.copy();I=focal_point(F,A);K=int(A.crop_height/2);L=int(A.crop_width/2);D=I.x-L
+	if D<0:D=0
+	elif D+A.crop_width>B.width:D=B.width-A.crop_width
+	E=I.y-K
+	if E<0:E=0
+	elif E+A.crop_height>B.height:E=B.height-A.crop_height
+	M=D+A.crop_width;N=E+A.crop_height;J=[D,E,M,N];G=[];G.append(B.crop(tuple(J)))
+	if A.annotate_image:
+		O=ImageDraw.Draw(F);H=list(J);H[2]-=1;H[3]-=1;O.rectangle(H,outline=GREEN);G.append(F)
+		if A.destop_view_image:F.show()
+	return G
+def focal_point(im,settings):
+	H=im;A=settings;J=image_corner_points(H,A)if A.corner_points_weight>0 else[];K=image_entropy_points(H,A)if A.entropy_points_weight>0 else[];L=image_face_points(H,A)if A.face_points_weight>0 else[];N=[];I=0
+	if J:I+=A.corner_points_weight
+	if K:I+=A.entropy_points_weight
+	if L:I+=A.face_points_weight
+	E=_A
+	if J:E=centroid(J);E.weight=A.corner_points_weight/I;N.append(E)
+	F=_A
+	if K:F=centroid(K);F.weight=A.entropy_points_weight/I;N.append(F)
+	G=_A
+	if L:G=centroid(L);G.weight=A.face_points_weight/I;N.append(G)
+	P=poi_average(N,A)
+	if A.annotate_image:
+		D=ImageDraw.Draw(H);O=min(H.width,H.height)*.07
+		if E is not _A:
+			B=BLUE;C=E.bounding(O*E.weight);D.text((C[0],C[1]-15),f"Edge: {E.weight:.02f}",fill=B);D.ellipse(C,outline=B)
+			if len(J)>1:
+				for M in J:D.rectangle(M.bounding(4),outline=B)
+		if F is not _A:
+			B='#ff0';C=F.bounding(O*F.weight);D.text((C[0],C[1]-15),f"Entropy: {F.weight:.02f}",fill=B);D.ellipse(C,outline=B)
+			if len(K)>1:
+				for M in K:D.rectangle(M.bounding(4),outline=B)
+		if G is not _A:
+			B=RED;C=G.bounding(O*G.weight);D.text((C[0],C[1]-15),f"Face: {G.weight:.02f}",fill=B);D.ellipse(C,outline=B)
+			if len(L)>1:
+				for M in L:D.rectangle(M.bounding(4),outline=B)
+		D.ellipse(P.bounding(O),outline=GREEN)
+	return P
+def image_face_points(im,settings):
+	D=settings;A=im
+	if D.dnn_model_path is not _A:
+		J=cv2.FaceDetectorYN.create(D.dnn_model_path,'',(A.width,A.height),.9,.3,5000);B=J.detect(np.array(A));E=[]
+		if B[1]is not _A:
+			for C in B[1]:K=C[0];L=C[1];F=C[2];M=C[3];E.append(PointOfInterest(int(K+F*.5),int(L+M*.33),size=F,weight=1/len(B[1])))
+		return E
+	else:
+		N=np.array(A);O=cv2.cvtColor(N,cv2.COLOR_BGR2GRAY);P=[[f"{cv2.data.haarcascades}haarcascade_eye.xml",.01],[f"{cv2.data.haarcascades}haarcascade_frontalface_default.xml",.05],[f"{cv2.data.haarcascades}haarcascade_profileface.xml",.05],[f"{cv2.data.haarcascades}haarcascade_frontalface_alt.xml",.05],[f"{cv2.data.haarcascades}haarcascade_frontalface_alt2.xml",.05],[f"{cv2.data.haarcascades}haarcascade_frontalface_alt_tree.xml",.05],[f"{cv2.data.haarcascades}haarcascade_eye_tree_eyeglasses.xml",.05],[f"{cv2.data.haarcascades}haarcascade_upperbody.xml",.05]]
+		for G in P:
+			Q=cv2.CascadeClassifier(G[0]);H=int(min(A.width,A.height)*G[1])
+			try:B=Q.detectMultiScale(O,scaleFactor=1.1,minNeighbors=7,minSize=(H,H),flags=cv2.CASCADE_SCALE_IMAGE)
+			except Exception:continue
+			if B:I=[[A[0],A[1],A[0]+A[2],A[1]+A[3]]for A in B];return[PointOfInterest((A[0]+A[2])//2,(A[1]+A[3])//2,size=abs(A[0]-A[2]),weight=1/len(I))for A in I]
+	return[]
+def image_corner_points(im,settings):
+	A=im.convert('L');D=ImageDraw.Draw(A);D.rectangle([0,im.height*.9,im.width,im.height],fill='#999');E=np.array(A);B=cv2.goodFeaturesToTrack(E,maxCorners=100,qualityLevel=.04,minDistance=min(A.width,A.height)*.06,useHarrisDetector=_B)
+	if B is _A:return[]
+	C=[]
+	for F in B:G,H=F.ravel();C.append(PointOfInterest(G,H,size=4,weight=1/len(B)))
+	return C
+def image_entropy_points(im,settings):
+	C=settings;A=im;I=A.height<A.width;J=A.height>A.width
+	if I:D=[0,2];F=A.size[0]
+	elif J:D=[1,3];F=A.size[1]
+	else:return[]
+	G=0;B=[0,0,C.crop_width,C.crop_height];E=B
+	while B[D[1]]<F:
+		K=A.crop(tuple(B));H=image_entropy(K)
+		if H>G:G=H;E=list(B)
+		B[D[0]]+=4;B[D[1]]+=4
+	L=int(E[0]+C.crop_width/2);M=int(E[1]+C.crop_height/2);return[PointOfInterest(L,M,size=25,weight=1.)]
+def image_entropy(im):B=np.asarray(im.convert('1'),dtype=np.uint8);A,C=np.histogram(B,bins=range(0,256));A=A[A>0];return-np.log2(A/A.sum()).sum()
+def centroid(pois):A=pois;B=[A.x for A in A];C=[A.y for A in A];return PointOfInterest(sum(B)/len(A),sum(C)/len(A))
+def poi_average(pois,settings):
+	C=.0;A=C;D=C;E=C
+	for B in pois:A+=B.weight;D+=B.x*B.weight;E+=B.y*B.weight
+	F=round(A and D/A);G=round(A and E/A);return PointOfInterest(F,G)
+def is_landscape(w,h):return w>h
+def is_portrait(w,h):return h>w
+def is_square(w,h):return w==h
 def download_and_cache_models(dirname):
-    download_url = 'https://github.com/opencv/opencv_zoo/blob/91fb0290f50896f38a0ab1e558b74b16bc009428/models/face_detection_yunet/face_detection_yunet_2022mar.onnx?raw=true'
-    model_file_name = 'face_detection_yunet.onnx'
-
-    os.makedirs(dirname, exist_ok=True)
-
-    cache_file = os.path.join(dirname, model_file_name)
-    if not os.path.exists(cache_file):
-        print(f"downloading face detection model from '{download_url}' to '{cache_file}'")
-        response = requests.get(download_url)
-        with open(cache_file, "wb") as f:
-            f.write(response.content)
-
-    if os.path.exists(cache_file):
-        return cache_file
-    return None
-
-
+	B=dirname;C='https://github.com/opencv/opencv_zoo/blob/91fb0290f50896f38a0ab1e558b74b16bc009428/models/face_detection_yunet/face_detection_yunet_2022mar.onnx?raw=true';D='face_detection_yunet.onnx';os.makedirs(B,exist_ok=True);A=os.path.join(B,D)
+	if not os.path.exists(A):
+		print(f"downloading face detection model from '{C}' to '{A}'");E=requests.get(C)
+		with open(A,'wb')as F:F.write(E.content)
+	if os.path.exists(A):return A
 class PointOfInterest:
-    def __init__(self, x, y, weight=1.0, size=10):
-        self.x = x
-        self.y = y
-        self.weight = weight
-        self.size = size
-
-    def bounding(self, size):
-        return [
-            self.x - size // 2,
-            self.y - size // 2,
-            self.x + size // 2,
-            self.y + size // 2
-        ]
-
-
+	def __init__(A,x,y,weight=1.,size=10):A.x=x;A.y=y;A.weight=weight;A.size=size
+	def bounding(A,size):B=size;return[A.x-B//2,A.y-B//2,A.x+B//2,A.y+B//2]
 class Settings:
-    def __init__(self, crop_width=512, crop_height=512, corner_points_weight=0.5, entropy_points_weight=0.5, face_points_weight=0.5, annotate_image=False, dnn_model_path=None):
-        self.crop_width = crop_width
-        self.crop_height = crop_height
-        self.corner_points_weight = corner_points_weight
-        self.entropy_points_weight = entropy_points_weight
-        self.face_points_weight = face_points_weight
-        self.annotate_image = annotate_image
-        self.destop_view_image = False
-        self.dnn_model_path = dnn_model_path
+	def __init__(A,crop_width=512,crop_height=512,corner_points_weight=.5,entropy_points_weight=.5,face_points_weight=.5,annotate_image=_B,dnn_model_path=_A):A.crop_width=crop_width;A.crop_height=crop_height;A.corner_points_weight=corner_points_weight;A.entropy_points_weight=entropy_points_weight;A.face_points_weight=face_points_weight;A.annotate_image=annotate_image;A.destop_view_image=_B;A.dnn_model_path=dnn_model_path

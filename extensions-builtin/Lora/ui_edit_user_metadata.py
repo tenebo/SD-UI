@@ -1,217 +1,67 @@
-import datetime
-import html
-import random
-
-import gradio as gr
-import re
-
+_H='preferred weight'
+_G='activation text'
+_F='Unknown'
+_E='metadata'
+_D=', '
+_C=False
+_B=True
+_A=None
+import datetime,html,random,gradio as gr,re
 from modules import ui_extra_networks_user_metadata
-
-
-def is_non_comma_tagset(tags):
-    average_tag_length = sum(len(x) for x in tags.keys()) / len(tags)
-
-    return average_tag_length >= 16
-
-
-re_word = re.compile(r"[-_\w']+")
-re_comma = re.compile(r" *, *")
-
-
+def is_non_comma_tagset(tags):A=sum(len(A)for A in tags.keys())/len(tags);return A>=16
+re_word=re.compile("[-_\\w']+")
+re_comma=re.compile(' *, *')
 def build_tags(metadata):
-    tags = {}
-
-    for _, tags_dict in metadata.get("ss_tag_frequency", {}).items():
-        for tag, tag_count in tags_dict.items():
-            tag = tag.strip()
-            tags[tag] = tags.get(tag, 0) + int(tag_count)
-
-    if tags and is_non_comma_tagset(tags):
-        new_tags = {}
-
-        for text, text_count in tags.items():
-            for word in re.findall(re_word, text):
-                if len(word) < 3:
-                    continue
-
-                new_tags[word] = new_tags.get(word, 0) + text_count
-
-        tags = new_tags
-
-    ordered_tags = sorted(tags.keys(), key=tags.get, reverse=True)
-
-    return [(tag, tags[tag]) for tag in ordered_tags]
-
-
+	A={}
+	for(J,E)in metadata.get('ss_tag_frequency',{}).items():
+		for(B,F)in E.items():B=B.strip();A[B]=A.get(B,0)+int(F)
+	if A and is_non_comma_tagset(A):
+		C={}
+		for(G,H)in A.items():
+			for D in re.findall(re_word,G):
+				if len(D)<3:continue
+				C[D]=C.get(D,0)+H
+		A=C
+	I=sorted(A.keys(),key=A.get,reverse=_B);return[(B,A[B])for B in I]
 class LoraUserMetadataEditor(ui_extra_networks_user_metadata.UserMetadataEditor):
-    def __init__(self, ui, tabname, page):
-        super().__init__(ui, tabname, page)
-
-        self.select_sd_version = None
-
-        self.taginfo = None
-        self.edit_activation_text = None
-        self.slider_preferred_weight = None
-        self.edit_notes = None
-
-    def save_lora_user_metadata(self, name, desc, sd_version, activation_text, preferred_weight, notes):
-        user_metadata = self.get_user_metadata(name)
-        user_metadata["description"] = desc
-        user_metadata["sd version"] = sd_version
-        user_metadata["activation text"] = activation_text
-        user_metadata["preferred weight"] = preferred_weight
-        user_metadata["notes"] = notes
-
-        self.write_user_metadata(name, user_metadata)
-
-    def get_metadata_table(self, name):
-        table = super().get_metadata_table(name)
-        item = self.page.items.get(name, {})
-        metadata = item.get("metadata") or {}
-
-        keys = {
-            'ss_output_name': "Output name:",
-            'ss_sd_model_name': "Model:",
-            'ss_clip_skip': "Clip skip:",
-            'ss_network_module': "Kohya module:",
-        }
-
-        for key, label in keys.items():
-            value = metadata.get(key, None)
-            if value is not None and str(value) != "None":
-                table.append((label, html.escape(value)))
-
-        ss_training_started_at = metadata.get('ss_training_started_at')
-        if ss_training_started_at:
-            table.append(("Date trained:", datetime.datetime.utcfromtimestamp(float(ss_training_started_at)).strftime('%Y-%m-%d %H:%M')))
-
-        ss_bucket_info = metadata.get("ss_bucket_info")
-        if ss_bucket_info and "buckets" in ss_bucket_info:
-            resolutions = {}
-            for _, bucket in ss_bucket_info["buckets"].items():
-                resolution = bucket["resolution"]
-                resolution = f'{resolution[1]}x{resolution[0]}'
-
-                resolutions[resolution] = resolutions.get(resolution, 0) + int(bucket["count"])
-
-            resolutions_list = sorted(resolutions.keys(), key=resolutions.get, reverse=True)
-            resolutions_text = html.escape(", ".join(resolutions_list[0:4]))
-            if len(resolutions) > 4:
-                resolutions_text += ", ..."
-                resolutions_text = f"<span title='{html.escape(', '.join(resolutions_list))}'>{resolutions_text}</span>"
-
-            table.append(('Resolutions:' if len(resolutions_list) > 1 else 'Resolution:', resolutions_text))
-
-        image_count = 0
-        for _, params in metadata.get("ss_dataset_dirs", {}).items():
-            image_count += int(params.get("img_count", 0))
-
-        if image_count:
-            table.append(("Dataset size:", image_count))
-
-        return table
-
-    def put_values_into_components(self, name):
-        user_metadata = self.get_user_metadata(name)
-        values = super().put_values_into_components(name)
-
-        item = self.page.items.get(name, {})
-        metadata = item.get("metadata") or {}
-
-        tags = build_tags(metadata)
-        gradio_tags = [(tag, str(count)) for tag, count in tags[0:24]]
-
-        return [
-            *values[0:5],
-            item.get("sd_version", "Unknown"),
-            gr.HighlightedText.update(value=gradio_tags, visible=True if tags else False),
-            user_metadata.get('activation text', ''),
-            float(user_metadata.get('preferred weight', 0.0)),
-            gr.update(visible=True if tags else False),
-            gr.update(value=self.generate_random_prompt_from_tags(tags), visible=True if tags else False),
-        ]
-
-    def generate_random_prompt(self, name):
-        item = self.page.items.get(name, {})
-        metadata = item.get("metadata") or {}
-        tags = build_tags(metadata)
-
-        return self.generate_random_prompt_from_tags(tags)
-
-    def generate_random_prompt_from_tags(self, tags):
-        max_count = None
-        res = []
-        for tag, count in tags:
-            if not max_count:
-                max_count = count
-
-            v = random.random() * max_count
-            if count > v:
-                res.append(tag)
-
-        return ", ".join(sorted(res))
-
-    def create_extra_default_items_in_left_column(self):
-
-        # this would be a lot better as gr.Radio but I can't make it work
-        self.select_sd_version = gr.Dropdown(['SD1', 'SD2', 'SDXL', 'Unknown'], value='Unknown', label='Standard Demo version', interactive=True)
-
-    def create_editor(self):
-        self.create_default_editor_elems()
-
-        self.taginfo = gr.HighlightedText(label="Training dataset tags")
-        self.edit_activation_text = gr.Text(label='Activation text', info="Will be added to prompt along with Lora")
-        self.slider_preferred_weight = gr.Slider(label='Preferred weight', info="Set to 0 to disable", minimum=0.0, maximum=2.0, step=0.01)
-
-        with gr.Row() as row_random_prompt:
-            with gr.Column(scale=8):
-                random_prompt = gr.Textbox(label='Random prompt', lines=4, max_lines=4, interactive=False)
-
-            with gr.Column(scale=1, min_width=120):
-                generate_random_prompt = gr.Button('Generate', size="lg", scale=1)
-
-        self.edit_notes = gr.TextArea(label='Notes', lines=4)
-
-        generate_random_prompt.click(fn=self.generate_random_prompt, inputs=[self.edit_name_input], outputs=[random_prompt], show_progress=False)
-
-        def select_tag(activation_text, evt: gr.SelectData):
-            tag = evt.value[0]
-
-            words = re.split(re_comma, activation_text)
-            if tag in words:
-                words = [x for x in words if x != tag and x.strip()]
-                return ", ".join(words)
-
-            return activation_text + ", " + tag if activation_text else tag
-
-        self.taginfo.select(fn=select_tag, inputs=[self.edit_activation_text], outputs=[self.edit_activation_text], show_progress=False)
-
-        self.create_default_buttons()
-
-        viewed_components = [
-            self.edit_name,
-            self.edit_description,
-            self.html_filedata,
-            self.html_preview,
-            self.edit_notes,
-            self.select_sd_version,
-            self.taginfo,
-            self.edit_activation_text,
-            self.slider_preferred_weight,
-            row_random_prompt,
-            random_prompt,
-        ]
-
-        self.button_edit\
-            .click(fn=self.put_values_into_components, inputs=[self.edit_name_input], outputs=viewed_components)\
-            .then(fn=lambda: gr.update(visible=True), inputs=[], outputs=[self.box])
-
-        edited_components = [
-            self.edit_description,
-            self.select_sd_version,
-            self.edit_activation_text,
-            self.slider_preferred_weight,
-            self.edit_notes,
-        ]
-
-        self.setup_save_handler(self.button_save, self.save_lora_user_metadata, edited_components)
+	def __init__(A,ui,tabname,page):super().__init__(ui,tabname,page);A.select_sd_version=_A;A.taginfo=_A;A.edit_activation_text=_A;A.slider_preferred_weight=_A;A.edit_notes=_A
+	def save_lora_user_metadata(B,name,desc,sd_version,activation_text,preferred_weight,notes):A=B.get_user_metadata(name);A['description']=desc;A['sd version']=sd_version;A[_G]=activation_text;A[_H]=preferred_weight;A['notes']=notes;B.write_user_metadata(name,A)
+	def get_metadata_table(M,name):
+		L='buckets';A=super().get_metadata_table(name);N=M.page.items.get(name,{});D=N.get(_E)or{};O={'ss_output_name':'Output name:','ss_sd_model_name':'Model:','ss_clip_skip':'Clip skip:','ss_network_module':'Kohya module:'}
+		for(P,Q)in O.items():
+			F=D.get(P,_A)
+			if F is not _A and str(F)!='None':A.append((Q,html.escape(F)))
+		J=D.get('ss_training_started_at')
+		if J:A.append(('Date trained:',datetime.datetime.utcfromtimestamp(float(J)).strftime('%Y-%m-%d %H:%M')))
+		G=D.get('ss_bucket_info')
+		if G and L in G:
+			B={}
+			for(R,K)in G[L].items():C=K['resolution'];C=f"{C[1]}x{C[0]}";B[C]=B.get(C,0)+int(K['count'])
+			H=sorted(B.keys(),key=B.get,reverse=_B);E=html.escape(_D.join(H[0:4]))
+			if len(B)>4:E+=', ...';E=f"<span title='{html.escape(_D.join(H))}'>{E}</span>"
+			A.append(('Resolutions:'if len(H)>1 else'Resolution:',E))
+		I=0
+		for(R,S)in D.get('ss_dataset_dirs',{}).items():I+=int(S.get('img_count',0))
+		if I:A.append(('Dataset size:',I))
+		return A
+	def put_values_into_components(B,name):C=name;D=B.get_user_metadata(C);F=super().put_values_into_components(C);E=B.page.items.get(C,{});G=E.get(_E)or{};A=build_tags(G);H=[(A,str(B))for(A,B)in A[0:24]];return[*F[0:5],E.get('sd_version',_F),gr.HighlightedText.update(value=H,visible=_B if A else _C),D.get(_G,''),float(D.get(_H,.0)),gr.update(visible=_B if A else _C),gr.update(value=B.generate_random_prompt_from_tags(A),visible=_B if A else _C)]
+	def generate_random_prompt(A,name):B=A.page.items.get(name,{});C=B.get(_E)or{};D=build_tags(C);return A.generate_random_prompt_from_tags(D)
+	def generate_random_prompt_from_tags(F,tags):
+		A=_A;B=[]
+		for(D,C)in tags:
+			if not A:A=C
+			E=random.random()*A
+			if C>E:B.append(D)
+		return _D.join(sorted(B))
+	def create_extra_default_items_in_left_column(A):A.select_sd_version=gr.Dropdown(['SD1','SD2','SDXL',_F],value=_F,label='Standard Demo version',interactive=_B)
+	def create_editor(A):
+		A.create_default_editor_elems();A.taginfo=gr.HighlightedText(label='Training dataset tags');A.edit_activation_text=gr.Text(label='Activation text',info='Will be added to prompt along with Lora');A.slider_preferred_weight=gr.Slider(label='Preferred weight',info='Set to 0 to disable',minimum=.0,maximum=2.,step=.01)
+		with gr.Row()as C:
+			with gr.Column(scale=8):B=gr.Textbox(label='Random prompt',lines=4,max_lines=4,interactive=_C)
+			with gr.Column(scale=1,min_width=120):D=gr.Button('Generate',size='lg',scale=1)
+		A.edit_notes=gr.TextArea(label='Notes',lines=4);D.click(fn=A.generate_random_prompt,inputs=[A.edit_name_input],outputs=[B],show_progress=_C)
+		def E(activation_text,evt):
+			C=activation_text;A=evt.value[0];B=re.split(re_comma,C)
+			if A in B:B=[B for B in B if B!=A and B.strip()];return _D.join(B)
+			return C+_D+A if C else A
+		A.taginfo.select(fn=E,inputs=[A.edit_activation_text],outputs=[A.edit_activation_text],show_progress=_C);A.create_default_buttons();F=[A.edit_name,A.edit_description,A.html_filedata,A.html_preview,A.edit_notes,A.select_sd_version,A.taginfo,A.edit_activation_text,A.slider_preferred_weight,C,B];A.button_edit.click(fn=A.put_values_into_components,inputs=[A.edit_name_input],outputs=F).then(fn=lambda:gr.update(visible=_B),inputs=[],outputs=[A.box]);G=[A.edit_description,A.select_sd_version,A.edit_activation_text,A.slider_preferred_weight,A.edit_notes];A.setup_save_handler(A.button_save,A.save_lora_user_metadata,G)

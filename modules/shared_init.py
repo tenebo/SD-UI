@@ -1,49 +1,7 @@
-import os
-
-import torch
-
+import os,torch
 from modules import shared
 from modules.shared import cmd_opts
-
-
 def initialize():
-    """Initializes fields inside the shared module in a controlled manner.
-
-    Should be called early because some other modules you can import mingt need these fields to be already set.
-    """
-
-    os.makedirs(cmd_opts.hypernetwork_dir, exist_ok=True)
-
-    from modules import options, shared_options
-    shared.options_templates = shared_options.options_templates
-    shared.opts = options.Options(shared_options.options_templates, shared_options.restricted_opts)
-    shared.restricted_opts = shared_options.restricted_opts
-    if os.path.exists(shared.config_filename):
-        shared.opts.load(shared.config_filename)
-
-    from modules import devices
-    devices.device, devices.device_interrogate, devices.device_gfpgan, devices.device_esrgan, devices.device_codeformer = \
-        (devices.cpu if any(y in cmd_opts.use_cpu for y in [x, 'all']) else devices.get_optimal_device() for x in ['sd', 'interrogate', 'gfpgan', 'esrgan', 'codeformer'])
-
-    devices.dtype = torch.float32 if cmd_opts.no_half else torch.float16
-    devices.dtype_vae = torch.float32 if cmd_opts.no_half or cmd_opts.no_half_vae else torch.float16
-
-    shared.device = devices.device
-    shared.weight_load_location = None if cmd_opts.lowram else "cpu"
-
-    from modules import shared_state
-    shared.state = shared_state.State()
-
-    from modules import styles
-    shared.prompt_styles = styles.StyleDatabase(shared.styles_filename)
-
-    from modules import interrogate
-    shared.interrogator = interrogate.InterrogateModels("interrogate")
-
-    from modules import shared_total_tqdm
-    shared.total_tqdm = shared_total_tqdm.TotalTQDM()
-
-    from modules import memmon, devices
-    shared.mem_mon = memmon.MemUsageMonitor("MemMon", devices.device, shared.opts)
-    shared.mem_mon.start()
-
+	'Initializes fields inside the shared module in a controlled manner.\n\n    Should be called early because some other modules you can import mingt need these fields to be already set.\n    ';C='interrogate';os.makedirs(cmd_opts.hypernetwork_dir,exist_ok=True);from modules import options as D,shared_options as B;shared.options_templates=B.options_templates;shared.opts=D.Options(B.options_templates,B.restricted_opts);shared.restricted_opts=B.restricted_opts
+	if os.path.exists(shared.config_filename):shared.opts.load(shared.config_filename)
+	from modules import devices as A;A.device,A.device_interrogate,A.device_gfpgan,A.device_esrgan,A.device_codeformer=(A.cpu if any(A in cmd_opts.use_cpu for A in[B,'all'])else A.get_optimal_device()for B in['sd',C,'gfpgan','esrgan','codeformer']);A.dtype=torch.float32 if cmd_opts.no_half else torch.float16;A.dtype_vae=torch.float32 if cmd_opts.no_half or cmd_opts.no_half_vae else torch.float16;shared.device=A.device;shared.weight_load_location=None if cmd_opts.lowram else'cpu';from modules import shared_state as E;shared.state=E.State();from modules import styles as F;shared.prompt_styles=F.StyleDatabase(shared.styles_filename);from modules import interrogate as G;shared.interrogator=G.InterrogateModels(C);from modules import shared_total_tqdm as H;shared.total_tqdm=H.TotalTQDM();from modules import memmon as I,devices as A;shared.mem_mon=I.MemUsageMonitor('MemMon',A.device,shared.opts);shared.mem_mon.start()

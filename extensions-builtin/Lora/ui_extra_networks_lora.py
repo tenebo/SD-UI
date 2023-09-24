@@ -1,79 +1,27 @@
-import os
-
-import network
-import networks
-
-from modules import shared, ui_extra_networks
+import os,network,networks
+from modules import shared,ui_extra_networks
 from modules.ui_extra_networks import quote_js
 from ui_edit_user_metadata import LoraUserMetadataEditor
-
-
 class ExtraNetworksPageLora(ui_extra_networks.ExtraNetworksPage):
-    def __init__(self):
-        super().__init__('Lora')
-
-    def refresh(self):
-        networks.list_available_networks()
-
-    def create_item(self, name, index=None, enable_filter=True):
-        lora_on_disk = networks.available_networks.get(name)
-
-        path, ext = os.path.splitext(lora_on_disk.filename)
-
-        alias = lora_on_disk.get_alias()
-
-        item = {
-            "name": name,
-            "filename": lora_on_disk.filename,
-            "shorthash": lora_on_disk.shorthash,
-            "preview": self.find_preview(path),
-            "description": self.find_description(path),
-            "search_term": self.search_terms_from_path(lora_on_disk.filename) + " " + (lora_on_disk.hash or ""),
-            "local_preview": f"{path}.{shared.opts.samples_format}",
-            "metadata": lora_on_disk.metadata,
-            "sort_keys": {'default': index, **self.get_sort_keys(lora_on_disk.filename)},
-            "sd_version": lora_on_disk.sd_version.name,
-        }
-
-        self.read_user_metadata(item)
-        activation_text = item["user_metadata"].get("activation text")
-        preferred_weight = item["user_metadata"].get("preferred weight", 0.0)
-        item["prompt"] = quote_js(f"<lora:{alias}:") + " + " + (str(preferred_weight) if preferred_weight else "opts.extra_networks_default_multiplier") + " + " + quote_js(">")
-
-        if activation_text:
-            item["prompt"] += " + " + quote_js(" " + activation_text)
-
-        sd_version = item["user_metadata"].get("sd version")
-        if sd_version in network.SdVersion.__members__:
-            item["sd_version"] = sd_version
-            sd_version = network.SdVersion[sd_version]
-        else:
-            sd_version = lora_on_disk.sd_version
-
-        if shared.opts.lora_show_all or not enable_filter:
-            pass
-        elif sd_version == network.SdVersion.Unknown:
-            model_version = network.SdVersion.SDXL if shared.sd_model.is_sdxl else network.SdVersion.SD2 if shared.sd_model.is_sd2 else network.SdVersion.SD1
-            if model_version.name in shared.opts.lora_hide_unknown_for_versions:
-                return None
-        elif shared.sd_model.is_sdxl and sd_version != network.SdVersion.SDXL:
-            return None
-        elif shared.sd_model.is_sd2 and sd_version != network.SdVersion.SD2:
-            return None
-        elif shared.sd_model.is_sd1 and sd_version != network.SdVersion.SD1:
-            return None
-
-        return item
-
-    def list_items(self):
-        for index, name in enumerate(networks.available_networks):
-            item = self.create_item(name, index)
-
-            if item is not None:
-                yield item
-
-    def allowed_directories_for_previews(self):
-        return [shared.cmd_opts.lora_dir, shared.cmd_opts.lyco_dir_backcompat]
-
-    def create_user_metadata_editor(self, ui, tabname):
-        return LoraUserMetadataEditor(ui, tabname, self)
+	def __init__(A):super().__init__('Lora')
+	def refresh(A):networks.list_available_networks()
+	def create_item(D,name,index=None,enable_filter=True):
+		K='prompt';J='sd_version';G=' + ';F='user_metadata';A=networks.available_networks.get(name);E,N=os.path.splitext(A.filename);L=A.get_alias();C={'name':name,'filename':A.filename,'shorthash':A.shorthash,'preview':D.find_preview(E),'description':D.find_description(E),'search_term':D.search_terms_from_path(A.filename)+' '+(A.hash or''),'local_preview':f"{E}.{shared.opts.samples_format}",'metadata':A.metadata,'sort_keys':{'default':index,**D.get_sort_keys(A.filename)},J:A.sd_version.name};D.read_user_metadata(C);H=C[F].get('activation text');I=C[F].get('preferred weight',.0);C[K]=quote_js(f"<lora:{L}:")+G+(str(I)if I else'opts.extra_networks_default_multiplier')+G+quote_js('>')
+		if H:C[K]+=G+quote_js(' '+H)
+		B=C[F].get('sd version')
+		if B in network.SdVersion.__members__:C[J]=B;B=network.SdVersion[B]
+		else:B=A.sd_version
+		if shared.opts.lora_show_all or not enable_filter:0
+		elif B==network.SdVersion.Unknown:
+			M=network.SdVersion.SDXL if shared.sd_model.is_sdxl else network.SdVersion.SD2 if shared.sd_model.is_sd2 else network.SdVersion.SD1
+			if M.name in shared.opts.lora_hide_unknown_for_versions:return
+		elif shared.sd_model.is_sdxl and B!=network.SdVersion.SDXL:return
+		elif shared.sd_model.is_sd2 and B!=network.SdVersion.SD2:return
+		elif shared.sd_model.is_sd1 and B!=network.SdVersion.SD1:return
+		return C
+	def list_items(B):
+		for(C,D)in enumerate(networks.available_networks):
+			A=B.create_item(D,C)
+			if A is not None:yield A
+	def allowed_directories_for_previews(A):return[shared.cmd_opts.lora_dir,shared.cmd_opts.lyco_dir_backcompat]
+	def create_user_metadata_editor(A,ui,tabname):return LoraUserMetadataEditor(ui,tabname,A)

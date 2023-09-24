@@ -1,356 +1,109 @@
+_D='input_ids'
+_C=None
+_B=False
+_A=1.
 import math
 from collections import namedtuple
-
 import torch
-
-from modules import prompt_parser, devices, sd_hijack
+from modules import prompt_parser,devices,sd_hijack
 from modules.shared import opts
-
-
 class PromptChunk:
-    """
-    This object contains token ids, weight (multipliers:1.4) and textual inversion embedding info for a chunk of prompt.
-    If a prompt is short, it is represented by one PromptChunk, otherwise, multiple are necessary.
-    Each PromptChunk contains an exact amount of tokens - 77, which includes one for start and end token,
-    so just 75 tokens from prompt.
-    """
-
-    def __init__(self):
-        self.tokens = []
-        self.multipliers = []
-        self.fixes = []
-
-
-PromptChunkFix = namedtuple('PromptChunkFix', ['offset', 'embedding'])
-"""An object of this type is a marker showing that textual inversion embedding's vectors have to placed at offset in the prompt
-chunk. Thos objects are found in PromptChunk.fixes and, are placed into FrozenCLIPEmbedderWithCustomWordsBase.hijack.fixes, and finally
-are applied by sd_hijack.EmbeddingsWithFixes's forward function."""
-
-
+	'\n    This object contains token ids, weight (multipliers:1.4) and textual inversion embedding info for a chunk of prompt.\n    If a prompt is short, it is represented by one PromptChunk, otherwise, multiple are necessary.\n    Each PromptChunk contains an exact amount of tokens - 77, which includes one for start and end token,\n    so just 75 tokens from prompt.\n    '
+	def __init__(A):A.tokens=[];A.multipliers=[];A.fixes=[]
+PromptChunkFix=namedtuple('PromptChunkFix',['offset','embedding'])
+"An object of this type is a marker showing that textual inversion embedding's vectors have to placed at offset in the prompt\nchunk. Thos objects are found in PromptChunk.fixes and, are placed into FrozenCLIPEmbedderWithCustomWordsBase.hijack.fixes, and finally\nare applied by sd_hijack.EmbeddingsWithFixes's forward function."
 class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
-    """A pytorch module that is a wrapper for FrozenCLIPEmbedder module. it enhances FrozenCLIPEmbedder, making it possible to
-    have unlimited prompt length and assign weights to tokens in prompt.
-    """
-
-    def __init__(self, wrapped, hijack):
-        super().__init__()
-
-        self.wrapped = wrapped
-        """Original FrozenCLIPEmbedder module; can also be FrozenOpenCLIPEmbedder or xlmr.BertSeriesModelWithTransformation,
-        depending on model."""
-
-        self.hijack: sd_hijack.StandardDemoModelHijack = hijack
-        self.chunk_length = 75
-
-        self.is_trainable = getattr(wrapped, 'is_trainable', False)
-        self.input_key = getattr(wrapped, 'input_key', 'txt')
-        self.legacy_ucg_val = None
-
-    def empty_chunk(self):
-        """creates an empty PromptChunk and returns it"""
-
-        chunk = PromptChunk()
-        chunk.tokens = [self.id_start] + [self.id_end] * (self.chunk_length + 1)
-        chunk.multipliers = [1.0] * (self.chunk_length + 2)
-        return chunk
-
-    def get_target_prompt_token_count(self, token_count):
-        """returns the maximum number of tokens a prompt of a known length can have before it requires one more PromptChunk to be represented"""
-
-        return math.ceil(max(token_count, 1) / self.chunk_length) * self.chunk_length
-
-    def tokenize(self, texts):
-        """Converts a batch of texts into a batch of token ids"""
-
-        raise NotImplementedError
-
-    def encode_with_transformers(self, tokens):
-        """
-        converts a batch of token ids (in python lists) into a single tensor with numeric respresentation of those tokens;
-        All python lists with tokens are assumed to have same length, usually 77.
-        if input is a list with B elements and each element has T tokens, expected output shape is (B, T, C), where C depends on
-        model - can be 768 and 1024.
-        Among other things, this call will read self.hijack.fixes, apply it to its inputs, and clear it (setting it to None).
-        """
-
-        raise NotImplementedError
-
-    def encode_embedding_init_text(self, init_text, nvpt):
-        """Converts text into a tensor with this text's tokens' embeddings. Note that those are embeddings before they are passed through
-        transformers. nvpt is used as a maximum length in tokens. If text produces less teokens than nvpt, only this many is returned."""
-
-        raise NotImplementedError
-
-    def tokenize_line(self, line):
-        """
-        this transforms a single prompt into a list of PromptChunk objects - as many as needed to
-        represent the prompt.
-        Returns the list and the total number of tokens in the prompt.
-        """
-
-        if opts.enable_emphasis:
-            parsed = prompt_parser.parse_prompt_attention(line)
-        else:
-            parsed = [[line, 1.0]]
-
-        tokenized = self.tokenize([text for text, _ in parsed])
-
-        chunks = []
-        chunk = PromptChunk()
-        token_count = 0
-        last_comma = -1
-
-        def next_chunk(is_last=False):
-            """puts current chunk into the list of results and produces the next one - empty;
-            if is_last is true, tokens <end-of-text> tokens at the end won't add to token_count"""
-            nonlocal token_count
-            nonlocal last_comma
-            nonlocal chunk
-
-            if is_last:
-                token_count += len(chunk.tokens)
-            else:
-                token_count += self.chunk_length
-
-            to_add = self.chunk_length - len(chunk.tokens)
-            if to_add > 0:
-                chunk.tokens += [self.id_end] * to_add
-                chunk.multipliers += [1.0] * to_add
-
-            chunk.tokens = [self.id_start] + chunk.tokens + [self.id_end]
-            chunk.multipliers = [1.0] + chunk.multipliers + [1.0]
-
-            last_comma = -1
-            chunks.append(chunk)
-            chunk = PromptChunk()
-
-        for tokens, (text, weight) in zip(tokenized, parsed):
-            if text == 'BREAK' and weight == -1:
-                next_chunk()
-                continue
-
-            position = 0
-            while position < len(tokens):
-                token = tokens[position]
-
-                if token == self.comma_token:
-                    last_comma = len(chunk.tokens)
-
-                # this is when we are at the end of alloted 75 tokens for the current chunk, and the current token is not a comma. opts.comma_padding_backtrack
-                # is a setting that specifies that if there is a comma nearby, the text after the comma should be moved out of this chunk and into the next.
-                elif opts.comma_padding_backtrack != 0 and len(chunk.tokens) == self.chunk_length and last_comma != -1 and len(chunk.tokens) - last_comma <= opts.comma_padding_backtrack:
-                    break_location = last_comma + 1
-
-                    reloc_tokens = chunk.tokens[break_location:]
-                    reloc_mults = chunk.multipliers[break_location:]
-
-                    chunk.tokens = chunk.tokens[:break_location]
-                    chunk.multipliers = chunk.multipliers[:break_location]
-
-                    next_chunk()
-                    chunk.tokens = reloc_tokens
-                    chunk.multipliers = reloc_mults
-
-                if len(chunk.tokens) == self.chunk_length:
-                    next_chunk()
-
-                embedding, embedding_length_in_tokens = self.hijack.embedding_db.find_embedding_at_position(tokens, position)
-                if embedding is None:
-                    chunk.tokens.append(token)
-                    chunk.multipliers.append(weight)
-                    position += 1
-                    continue
-
-                emb_len = int(embedding.vectors)
-                if len(chunk.tokens) + emb_len > self.chunk_length:
-                    next_chunk()
-
-                chunk.fixes.append(PromptChunkFix(len(chunk.tokens), embedding))
-
-                chunk.tokens += [0] * emb_len
-                chunk.multipliers += [weight] * emb_len
-                position += embedding_length_in_tokens
-
-        if chunk.tokens or not chunks:
-            next_chunk(is_last=True)
-
-        return chunks, token_count
-
-    def process_texts(self, texts):
-        """
-        Accepts a list of texts and calls tokenize_line() on each, with cache. Returns the list of results and maximum
-        length, in tokens, of all texts.
-        """
-
-        token_count = 0
-
-        cache = {}
-        batch_chunks = []
-        for line in texts:
-            if line in cache:
-                chunks = cache[line]
-            else:
-                chunks, current_token_count = self.tokenize_line(line)
-                token_count = max(current_token_count, token_count)
-
-                cache[line] = chunks
-
-            batch_chunks.append(chunks)
-
-        return batch_chunks, token_count
-
-    def forward(self, texts):
-        """
-        Accepts an array of texts; Passes texts through transformers network to create a tensor with numerical representation of those texts.
-        Returns a tensor with shape of (B, T, C), where B is length of the array; T is length, in tokens, of texts (including padding) - T will
-        be a multiple of 77; and C is dimensionality of each token - for SD1 it's 768, for SD2 it's 1024, and for SDXL it's 1280.
-        An example shape returned by this function can be: (2, 77, 768).
-        For SDXL, instead of returning one tensor avobe, it returns a tuple with two: the other one with shape (B, 1280) with pooled values.
-        Webui usually sends just one text at a time through this function - the only time when texts is an array with more than one elemenet
-        is when you do prompt editing: "a picture of a [cat:dog:0.4] eating ice cream"
-        """
-
-        if opts.use_old_emphasis_implementation:
-            import modules.sd_hijack_clip_old
-            return modules.sd_hijack_clip_old.forward_old(self, texts)
-
-        batch_chunks, token_count = self.process_texts(texts)
-
-        used_embeddings = {}
-        chunk_count = max([len(x) for x in batch_chunks])
-
-        zs = []
-        for i in range(chunk_count):
-            batch_chunk = [chunks[i] if i < len(chunks) else self.empty_chunk() for chunks in batch_chunks]
-
-            tokens = [x.tokens for x in batch_chunk]
-            multipliers = [x.multipliers for x in batch_chunk]
-            self.hijack.fixes = [x.fixes for x in batch_chunk]
-
-            for fixes in self.hijack.fixes:
-                for _position, embedding in fixes:
-                    used_embeddings[embedding.name] = embedding
-
-            z = self.process_tokens(tokens, multipliers)
-            zs.append(z)
-
-        if opts.textual_inversion_add_hashes_to_infotext and used_embeddings:
-            hashes = []
-            for name, embedding in used_embeddings.items():
-                shorthash = embedding.shorthash
-                if not shorthash:
-                    continue
-
-                name = name.replace(":", "").replace(",", "")
-                hashes.append(f"{name}: {shorthash}")
-
-            if hashes:
-                if self.hijack.extra_generation_params.get("TI hashes"):
-                    hashes.append(self.hijack.extra_generation_params.get("TI hashes"))
-                self.hijack.extra_generation_params["TI hashes"] = ", ".join(hashes)
-
-        if getattr(self.wrapped, 'return_pooled', False):
-            return torch.hstack(zs), zs[0].pooled
-        else:
-            return torch.hstack(zs)
-
-    def process_tokens(self, remade_batch_tokens, batch_multipliers):
-        """
-        sends one single prompt chunk to be encoded by transformers neural network.
-        remade_batch_tokens is a batch of tokens - a list, where every element is a list of tokens; usually
-        there are exactly 77 tokens in the list. batch_multipliers is the same but for multipliers instead of tokens.
-        Multipliers are used to give more or less weight to the outputs of transformers network. Each multiplier
-        corresponds to one token.
-        """
-        tokens = torch.asarray(remade_batch_tokens).to(devices.device)
-
-        # this is for SD2: SD1 uses the same token for padding and end of text, while SD2 uses different ones.
-        if self.id_end != self.id_pad:
-            for batch_pos in range(len(remade_batch_tokens)):
-                index = remade_batch_tokens[batch_pos].index(self.id_end)
-                tokens[batch_pos, index+1:tokens.shape[1]] = self.id_pad
-
-        z = self.encode_with_transformers(tokens)
-
-        pooled = getattr(z, 'pooled', None)
-
-        # restoring original mean is likely not correct, but it seems to work well to prevent artifacts that happen otherwise
-        batch_multipliers = torch.asarray(batch_multipliers).to(devices.device)
-        original_mean = z.mean()
-        z = z * batch_multipliers.reshape(batch_multipliers.shape + (1,)).expand(z.shape)
-        new_mean = z.mean()
-        z = z * (original_mean / new_mean)
-
-        if pooled is not None:
-            z.pooled = pooled
-
-        return z
-
-
+	'A pytorch module that is a wrapper for FrozenCLIPEmbedder module. it enhances FrozenCLIPEmbedder, making it possible to\n    have unlimited prompt length and assign weights to tokens in prompt.\n    '
+	def __init__(A,wrapped,hijack):B=wrapped;super().__init__();A.wrapped=B;'Original FrozenCLIPEmbedder module; can also be FrozenOpenCLIPEmbedder or xlmr.BertSeriesModelWithTransformation,\n        depending on model.';A.hijack=hijack;A.chunk_length=75;A.is_trainable=getattr(B,'is_trainable',_B);A.input_key=getattr(B,'input_key','txt');A.legacy_ucg_val=_C
+	def empty_chunk(A):'creates an empty PromptChunk and returns it';B=PromptChunk();B.tokens=[A.id_start]+[A.id_end]*(A.chunk_length+1);B.multipliers=[_A]*(A.chunk_length+2);return B
+	def get_target_prompt_token_count(A,token_count):'returns the maximum number of tokens a prompt of a known length can have before it requires one more PromptChunk to be represented';return math.ceil(max(token_count,1)/A.chunk_length)*A.chunk_length
+	def tokenize(A,texts):'Converts a batch of texts into a batch of token ids';raise NotImplementedError
+	def encode_with_transformers(A,tokens):'\n        converts a batch of token ids (in python lists) into a single tensor with numeric respresentation of those tokens;\n        All python lists with tokens are assumed to have same length, usually 77.\n        if input is a list with B elements and each element has T tokens, expected output shape is (B, T, C), where C depends on\n        model - can be 768 and 1024.\n        Among other things, this call will read self.hijack.fixes, apply it to its inputs, and clear it (setting it to None).\n        ';raise NotImplementedError
+	def encode_embedding_init_text(A,init_text,nvpt):"Converts text into a tensor with this text's tokens' embeddings. Note that those are embeddings before they are passed through\n        transformers. nvpt is used as a maximum length in tokens. If text produces less teokens than nvpt, only this many is returned.";raise NotImplementedError
+	def tokenize_line(B,line):
+		'\n        this transforms a single prompt into a list of PromptChunk objects - as many as needed to\n        represent the prompt.\n        Returns the list and the total number of tokens in the prompt.\n        '
+		if opts.enable_emphasis:H=prompt_parser.parse_prompt_attention(line)
+		else:H=[[line,_A]]
+		O=B.tokenize([A for(A,B)in H]);I=[];A=PromptChunk();F=0;C=-1
+		def D(is_last=_B):
+			"puts current chunk into the list of results and produces the next one - empty;\n            if is_last is true, tokens <end-of-text> tokens at the end won't add to token_count";nonlocal F;nonlocal C;nonlocal A
+			if is_last:F+=len(A.tokens)
+			else:F+=B.chunk_length
+			D=B.chunk_length-len(A.tokens)
+			if D>0:A.tokens+=[B.id_end]*D;A.multipliers+=[_A]*D
+			A.tokens=[B.id_start]+A.tokens+[B.id_end];A.multipliers=[_A]+A.multipliers+[_A];C=-1;I.append(A);A=PromptChunk()
+		for(J,(P,K))in zip(O,H):
+			if P=='BREAK'and K==-1:D();continue
+			E=0
+			while E<len(J):
+				N=J[E]
+				if N==B.comma_token:C=len(A.tokens)
+				elif opts.comma_padding_backtrack!=0 and len(A.tokens)==B.chunk_length and C!=-1 and len(A.tokens)-C<=opts.comma_padding_backtrack:G=C+1;Q=A.tokens[G:];R=A.multipliers[G:];A.tokens=A.tokens[:G];A.multipliers=A.multipliers[:G];D();A.tokens=Q;A.multipliers=R
+				if len(A.tokens)==B.chunk_length:D()
+				L,S=B.hijack.embedding_db.find_embedding_at_position(J,E)
+				if L is _C:A.tokens.append(N);A.multipliers.append(K);E+=1;continue
+				M=int(L.vectors)
+				if len(A.tokens)+M>B.chunk_length:D()
+				A.fixes.append(PromptChunkFix(len(A.tokens),L));A.tokens+=[0]*M;A.multipliers+=[K]*M;E+=S
+		if A.tokens or not I:D(is_last=True)
+		return I,F
+	def process_texts(F,texts):
+		'\n        Accepts a list of texts and calls tokenize_line() on each, with cache. Returns the list of results and maximum\n        length, in tokens, of all texts.\n        ';B=0;C={};E=[]
+		for A in texts:
+			if A in C:D=C[A]
+			else:D,G=F.tokenize_line(A);B=max(G,B);C[A]=D
+			E.append(D)
+		return E,B
+	def forward(A,texts):
+		'\n        Accepts an array of texts; Passes texts through transformers network to create a tensor with numerical representation of those texts.\n        Returns a tensor with shape of (B, T, C), where B is length of the array; T is length, in tokens, of texts (including padding) - T will\n        be a multiple of 77; and C is dimensionality of each token - for SD1 it\'s 768, for SD2 it\'s 1024, and for SDXL it\'s 1280.\n        An example shape returned by this function can be: (2, 77, 768).\n        For SDXL, instead of returning one tensor avobe, it returns a tuple with two: the other one with shape (B, 1280) with pooled values.\n        Webui usually sends just one text at a time through this function - the only time when texts is an array with more than one elemenet\n        is when you do prompt editing: "a picture of a [cat:dog:0.4] eating ice cream"\n        ';I=texts;H='TI hashes'
+		if opts.use_old_emphasis_implementation:import modules.sd_hijack_clip_old;return modules.sd_hijack_clip_old.forward_old(A,I)
+		J,R=A.process_texts(I);E={};M=max([len(A)for A in J]);B=[]
+		for K in range(M):
+			F=[B[K]if K<len(B)else A.empty_chunk()for B in J];N=[A.tokens for A in F];O=[A.multipliers for A in F];A.hijack.fixes=[A.fixes for A in F]
+			for P in A.hijack.fixes:
+				for(S,C)in P:E[C.name]=C
+			Q=A.process_tokens(N,O);B.append(Q)
+		if opts.textual_inversion_add_hashes_to_infotext and E:
+			D=[]
+			for(G,C)in E.items():
+				L=C.shorthash
+				if not L:continue
+				G=G.replace(':','').replace(',','');D.append(f"{G}: {L}")
+			if D:
+				if A.hijack.extra_generation_params.get(H):D.append(A.hijack.extra_generation_params.get(H))
+				A.hijack.extra_generation_params[H]=', '.join(D)
+		if getattr(A.wrapped,'return_pooled',_B):return torch.hstack(B),B[0].pooled
+		else:return torch.hstack(B)
+	def process_tokens(B,remade_batch_tokens,batch_multipliers):
+		'\n        sends one single prompt chunk to be encoded by transformers neural network.\n        remade_batch_tokens is a batch of tokens - a list, where every element is a list of tokens; usually\n        there are exactly 77 tokens in the list. batch_multipliers is the same but for multipliers instead of tokens.\n        Multipliers are used to give more or less weight to the outputs of transformers network. Each multiplier\n        corresponds to one token.\n        ';D=remade_batch_tokens;C=batch_multipliers;E=torch.asarray(D).to(devices.device)
+		if B.id_end!=B.id_pad:
+			for F in range(len(D)):H=D[F].index(B.id_end);E[F,H+1:E.shape[1]]=B.id_pad
+		A=B.encode_with_transformers(E);G=getattr(A,'pooled',_C);C=torch.asarray(C).to(devices.device);I=A.mean();A=A*C.reshape(C.shape+(1,)).expand(A.shape);J=A.mean();A=A*(I/J)
+		if G is not _C:A.pooled=G
+		return A
 class FrozenCLIPEmbedderWithCustomWords(FrozenCLIPEmbedderWithCustomWordsBase):
-    def __init__(self, wrapped, hijack):
-        super().__init__(wrapped, hijack)
-        self.tokenizer = wrapped.tokenizer
-
-        vocab = self.tokenizer.get_vocab()
-
-        self.comma_token = vocab.get(',</w>', None)
-
-        self.token_mults = {}
-        tokens_with_parens = [(k, v) for k, v in vocab.items() if '(' in k or ')' in k or '[' in k or ']' in k]
-        for text, ident in tokens_with_parens:
-            mult = 1.0
-            for c in text:
-                if c == '[':
-                    mult /= 1.1
-                if c == ']':
-                    mult *= 1.1
-                if c == '(':
-                    mult *= 1.1
-                if c == ')':
-                    mult /= 1.1
-
-            if mult != 1.0:
-                self.token_mults[ident] = mult
-
-        self.id_start = self.wrapped.tokenizer.bos_token_id
-        self.id_end = self.wrapped.tokenizer.eos_token_id
-        self.id_pad = self.id_end
-
-    def tokenize(self, texts):
-        tokenized = self.wrapped.tokenizer(texts, truncation=False, add_special_tokens=False)["input_ids"]
-
-        return tokenized
-
-    def encode_with_transformers(self, tokens):
-        outputs = self.wrapped.transformer(input_ids=tokens, output_hidden_states=-opts.CLIP_stop_at_last_layers)
-
-        if opts.CLIP_stop_at_last_layers > 1:
-            z = outputs.hidden_states[-opts.CLIP_stop_at_last_layers]
-            z = self.wrapped.transformer.text_model.final_layer_norm(z)
-        else:
-            z = outputs.last_hidden_state
-
-        return z
-
-    def encode_embedding_init_text(self, init_text, nvpt):
-        embedding_layer = self.wrapped.transformer.text_model.embeddings
-        ids = self.wrapped.tokenizer(init_text, max_length=nvpt, return_tensors="pt", add_special_tokens=False)["input_ids"]
-        embedded = embedding_layer.token_embedding.wrapped(ids.to(embedding_layer.token_embedding.wrapped.weight.device)).squeeze(0)
-
-        return embedded
-
-
+	def __init__(A,wrapped,hijack):
+		D=wrapped;super().__init__(D,hijack);A.tokenizer=D.tokenizer;E=A.tokenizer.get_vocab();A.comma_token=E.get(',</w>',_C);A.token_mults={};F=[(A,B)for(A,B)in E.items()if'('in A or')'in A or'['in A or']'in A]
+		for(G,H)in F:
+			B=_A
+			for C in G:
+				if C=='[':B/=1.1
+				if C==']':B*=1.1
+				if C=='(':B*=1.1
+				if C==')':B/=1.1
+			if B!=_A:A.token_mults[H]=B
+		A.id_start=A.wrapped.tokenizer.bos_token_id;A.id_end=A.wrapped.tokenizer.eos_token_id;A.id_pad=A.id_end
+	def tokenize(A,texts):B=A.wrapped.tokenizer(texts,truncation=_B,add_special_tokens=_B)[_D];return B
+	def encode_with_transformers(B,tokens):
+		C=B.wrapped.transformer(input_ids=tokens,output_hidden_states=-opts.CLIP_stop_at_last_layers)
+		if opts.CLIP_stop_at_last_layers>1:A=C.hidden_states[-opts.CLIP_stop_at_last_layers];A=B.wrapped.transformer.text_model.final_layer_norm(A)
+		else:A=C.last_hidden_state
+		return A
+	def encode_embedding_init_text(A,init_text,nvpt):B=A.wrapped.transformer.text_model.embeddings;C=A.wrapped.tokenizer(init_text,max_length=nvpt,return_tensors='pt',add_special_tokens=_B)[_D];D=B.token_embedding.wrapped(C.to(B.token_embedding.wrapped.weight.device)).squeeze(0);return D
 class FrozenCLIPEmbedderForSDXLWithCustomWords(FrozenCLIPEmbedderWithCustomWords):
-    def __init__(self, wrapped, hijack):
-        super().__init__(wrapped, hijack)
-
-    def encode_with_transformers(self, tokens):
-        outputs = self.wrapped.transformer(input_ids=tokens, output_hidden_states=self.wrapped.layer == "hidden")
-
-        if self.wrapped.layer == "last":
-            z = outputs.last_hidden_state
-        else:
-            z = outputs.hidden_states[self.wrapped.layer_idx]
-
-        return z
+	def __init__(A,wrapped,hijack):super().__init__(wrapped,hijack)
+	def encode_with_transformers(A,tokens):
+		B=A.wrapped.transformer(input_ids=tokens,output_hidden_states=A.wrapped.layer=='hidden')
+		if A.wrapped.layer=='last':C=B.last_hidden_state
+		else:C=B.hidden_states[A.wrapped.layer_idx]
+		return C

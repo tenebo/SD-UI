@@ -1,34 +1,17 @@
-import json
-import os
-
-from modules import errors, scripts
-
-localizations = {}
-
-
+import json,os
+from modules import errors,scripts
+localizations={}
 def list_localizations(dirname):
-    localizations.clear()
-
-    for file in os.listdir(dirname):
-        fn, ext = os.path.splitext(file)
-        if ext.lower() != ".json":
-            continue
-
-        localizations[fn] = os.path.join(dirname, file)
-
-    for file in scripts.list_scripts("localizations", ".json"):
-        fn, ext = os.path.splitext(file.filename)
-        localizations[fn] = file.path
-
-
-def localization_js(current_localization_name: str) -> str:
-    fn = localizations.get(current_localization_name, None)
-    data = {}
-    if fn is not None:
-        try:
-            with open(fn, "r", encoding="utf8") as file:
-                data = json.load(file)
-        except Exception:
-            errors.report(f"Error loading localization from {fn}", exc_info=True)
-
-    return f"window.localization = {json.dumps(data)}"
+	E='.json';C=dirname;localizations.clear()
+	for A in os.listdir(C):
+		B,D=os.path.splitext(A)
+		if D.lower()!=E:continue
+		localizations[B]=os.path.join(C,A)
+	for A in scripts.list_scripts('localizations',E):B,D=os.path.splitext(A.filename);localizations[B]=A.path
+def localization_js(current_localization_name):
+	A=localizations.get(current_localization_name,None);B={}
+	if A is not None:
+		try:
+			with open(A,'r',encoding='utf8')as C:B=json.load(C)
+		except Exception:errors.report(f"Error loading localization from {A}",exc_info=True)
+	return f"window.localization = {json.dumps(B)}"
