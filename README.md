@@ -109,7 +109,7 @@ Alternatively, use online services (like Google Colab):
 
 ### Installation on Windows 10/11 with NVidia-GPUs using release package
 
-1. Download `sd.webui.zip` from [v1.0.0-pre](https://github.com/tenebo/standard-demo-we/releases/tag/v1.0.0-pre) and extract it's contents.
+1. Download `sd.ourui.zip` from [v1.0.0-pre](https://github.com/tenebo/standard-demo-we/releases/tag/v1.0.0-pre) and extract it's contents.
 2. Run `update.bat`.
 3. Run `run.bat`.
    > For more details see [Install-and-Run-on-NVidia-GPUs](https://github.com/tenebo/standard-demo-we/wiki/Install-and-Run-on-NVidia-GPUs)
@@ -119,7 +119,7 @@ Alternatively, use online services (like Google Colab):
 1. Install [Python 3.10.6](https://www.python.org/downloads/release/python-3106/) (Newer version of Python does not support torch), checking "Add Python to PATH".
 2. Install [git](https://git-scm.com/download/win).
 3. Download the standard-demo-we repository, for example by running `git clone https://github.com/tenebo/standard-demo-we.git`.
-4. Run `webui-user.bat` from Windows Explorer as normal, non-administrator, user.
+4. Run `ourui-user.bat` from Windows Explorer as normal, non-administrator, user.
 
 ### Automatic Installation on Linux
 
@@ -134,14 +134,14 @@ sudo dnf install wget git python3
 sudo pacman -S wget git python3
 ```
 
-2. Navigate to the directory you would like the webui to be installed and execute the following command:
+2. Navigate to the directory you would like the ourui to be installed and execute the following command:
 
 ```bash
-wget -q https://raw.githubusercontent.com/tenebo/standard-demo-we/master/webui.sh
+wget -q https://raw.githubusercontent.com/tenebo/standard-demo-we/master/webourui
 ```
 
-3. Run `webui.sh`.
-4. Check `webui-user.sh` for options.
+3. Run `ourui.sh`.
+4. Check `ourui-user.sh` for options.
 
 ### Installation on Apple Silicon
 

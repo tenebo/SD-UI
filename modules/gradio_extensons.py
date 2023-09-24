@@ -7,13 +7,13 @@ def add_classes_to_gradio_component(comp):
 	'\n    this adds gradio-* to the component for css styling (ie gradio-button to gr.Button), as well as some others\n    ';B='multiselect';A=comp;A.elem_classes=[f"gradio-{A.get_block_name()}",*(A.elem_classes or[])]
 	if getattr(A,B,False):A.elem_classes.append(B)
 def IOComponent_init(self,*C,**B):
-	A=self;A.webui_tooltip=B.pop('tooltip',_A)
+	A=self;A.ourui_tooltip=B.pop('tooltip',_A)
 	if scripts.scripts_current is not _A:scripts.scripts_current.before_component(A,**B)
 	scripts.script_callbacks.before_component_callback(A,**B);D=original_IOComponent_init(A,*C,**B);add_classes_to_gradio_component(A);scripts.script_callbacks.after_component_callback(A,**B)
 	if scripts.scripts_current is not _A:scripts.scripts_current.after_component(A,**B)
 	return D
 def Block_get_config(self):
-	B='webui_tooltip';A=original_Block_get_config(self);C=getattr(self,B,_A)
+	B='ourui_tooltip';A=original_Block_get_config(self);C=getattr(self,B,_A)
 	if C:A[B]=C
 	A.pop(_B,_A);return A
 def BlockContext_init(self,*A,**B):C=original_BlockContext_init(self,*A,**B);add_classes_to_gradio_component(self);return C

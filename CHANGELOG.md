@@ -47,7 +47,7 @@
 - enable cond cache by default
 - git autofix for repos that are corrupted ([#12230](https://github.com/tenebo/standard-demo-we/pull/12230))
 - allow to open images in new browser tab by middle mouse button ([#12379](https://github.com/tenebo/standard-demo-we/pull/12379))
-- automatically open webui in browser when running "locally" ([#12254](https://github.com/tenebo/standard-demo-we/pull/12254))
+- automatically open ourui in browser when running "locally" ([#12254](https://github.com/tenebo/standard-demo-we/pull/12254))
 - put commonly used samplers on top, make DPM++ 2M Karras the default choice
 - zoom and pan: option to auto-expand a wide image, improved integration ([#12413](https://github.com/tenebo/standard-demo-we/pull/12413), [#12727](https://github.com/tenebo/standard-demo-we/pull/12727))
 - option to cache Lora networks in memory
@@ -78,7 +78,7 @@
 - support tooltip kwarg for gradio elements: gr.Textbox(label='hello', tooltip='world')
 - properly clear the total console progressbar when using txt2img and img2img from API
 - add cmd_arg --disable-extra-extensions and --disable-all-extensions ([#12294](https://github.com/tenebo/standard-demo-we/pull/12294))
-- shared.py and webui.py split into many files
+- shared.py and ourui.py split into many files
 - add --loglevel commandline argument for logging
 - add a custom UI element that combines accordion and checkbox
 - avoid importing gradio in tests because it spams warnings
@@ -143,7 +143,7 @@
 - don't show hidden samplers in dropdown for XYZ script ([#12780](https://github.com/tenebo/standard-demo-we/pull/12737))
 - fix style editing dialog breaking if it's opened in both img2img and txt2img tabs
 - fix a bug allowing users to bypass gradio and API authentication (reported by vysecurity)
-- fix notification not playing when built-in webui tab is inactive ([#12834](https://github.com/tenebo/standard-demo-we/pull/12834))
+- fix notification not playing when built-in ourui tab is inactive ([#12834](https://github.com/tenebo/standard-demo-we/pull/12834))
 - honor `--skip-install` for extension installers ([#12832](https://github.com/tenebo/standard-demo-we/pull/12832))
 - don't print blank stdout in extension installers ([#12833](https://github.com/tenebo/standard-demo-we/pull/12832), [#12855](https://github.com/tenebo/standard-demo-we/pull/12855))
 - do not change quicksettings dropdown option when value returned is `None` ([#12854](https://github.com/tenebo/standard-demo-we/pull/12854))
@@ -176,7 +176,7 @@
 - if txt2img/img2img raises an exception, finally call state.end()
 - fix composable diffusion weight parsing
 - restyle Startup profile for black users
-- fix webui not launching with --nowebui
+- fix ourui not launching with --noourui
 - catch exception for non git extensions
 - fix some options missing from /sdapi/v1/options
 - fix for extension update status always saying "unknown"
@@ -287,7 +287,7 @@
 
 ### Extensions:
 
-- After installing extensions, webui properly restarts the process rather than reloads the UI
+- After installing extensions, ourui properly restarts the process rather than reloads the UI
 - Added VAE listing to web API. Via: /sdapi/v1/sd-vae
 - custom unet support
 - Add onAfterUiUpdate callback
@@ -394,14 +394,14 @@
 - fix an issue preventing the program from starting if the user specifies a bad Gradio theme
 - fix broken prompts from file script
 - fix symlink scanning for extra networks
-- fix --data-dir ignored when launching via webui-user.bat COMMANDLINE_ARGS
+- fix --data-dir ignored when launching via ourui-user.bat COMMANDLINE_ARGS
 - allow web UI to be ran fully offline
 - fix inability to run with --freeze-settings
 - fix inability to merge checkpoint without adding metadata
 - fix extra networks' save preview image not adding infotext for jpeg/webm
 - remove blinking effect from text in hires fix and scale resolution preview
 - make links to `http://<...>.git` extensions work in the extension tab
-- fix bug with webui hanging at startup due to hanging git process
+- fix bug with ourui hanging at startup due to hanging git process
 
 ## 1.2.1
 
@@ -459,7 +459,7 @@
 - make the lightbox fullscreen image function properly
 - fix squished thumbnails in extras tab
 - keep "search" filter for extra networks when user refreshes the tab (previously it showed everthing after you refreshed)
-- fix webui showing the same image if you configure the generation to always save results into same file
+- fix ourui showing the same image if you configure the generation to always save results into same file
 - fix bug with upscalers not working properly
 - fix MPS on PyTorch 2.0.1, Intel Macs
 - make it so that custom context menu from contextMenu.js only disappears after user's click, ignoring non-user click events
@@ -470,7 +470,7 @@
 
 ### Bug Fixes:
 
-- fix an error that prevents running webui on PyTorch<2.0 without --disable-safe-unpickle
+- fix an error that prevents running ourui on PyTorch<2.0 without --disable-safe-unpickle
 
 ## 1.1.0
 

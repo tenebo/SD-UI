@@ -167,9 +167,9 @@ def configure_for_tests():
 	if A not in sys.argv:sys.argv.append(A)
 	os.environ['COMMANDLINE_ARGS']=''
 def start():
-	A='--nowebui';print(f"Launching {'API server'if A in sys.argv else'Web UI'} with arguments: {' '.join(sys.argv[1:])}");import webui as B
+	A='--noourui';print(f"Launching {'API server'if A in sys.argv else'Web UI'} with arguments: {' '.join(sys.argv[1:])}");import ourui as B
 	if A in sys.argv:B.api_only()
-	else:B.webui()
+	else:B.ourui()
 def dump_sysinfo():
 	from modules import sysinfo as B;import datetime as C;D=B.get();A=f"sysinfo-{C.datetime.utcnow().strftime('%Y-%m-%d-%H-%M')}.txt"
 	with open(A,'w',encoding=_D)as E:E.write(D)

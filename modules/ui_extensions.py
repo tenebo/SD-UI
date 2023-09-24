@@ -11,7 +11,7 @@ _J='checked="checked"'
 _I='both'
 _H='installed'
 _G='name'
-_F='webui'
+_F='ourui'
 _E='extensions'
 _D='Current'
 _C=True
@@ -40,16 +40,16 @@ def apply_and_restart(disable_list,update_list,disable_all):
 def save_config_state(name):
 	A=name;C=config_states.get_config()
 	if not A:A=_N
-	C[_G]=A;D=datetime.now().strftime('%Y_%m_%d-%H_%M_%S');B=os.path.join(config_states_dir,f"{D}_{A}.json");print(f"Saving backup of webui/extension state to {B}.")
+	C[_G]=A;D=datetime.now().strftime('%Y_%m_%d-%H_%M_%S');B=os.path.join(config_states_dir,f"{D}_{A}.json");print(f"Saving backup of ourui/extension state to {B}.")
 	with open(B,'w',encoding='utf-8')as E:json.dump(C,E,indent=4)
-	config_states.list_config_states();F=next(iter(config_states.all_config_states.keys()),_D);G=[_D]+list(config_states.all_config_states.keys());return gr.Dropdown.update(value=F,choices=G),f'<span>Saved current webui/extension state to "{B}"</span>'
+	config_states.list_config_states();F=next(iter(config_states.all_config_states.keys()),_D);G=[_D]+list(config_states.all_config_states.keys());return gr.Dropdown.update(value=F,choices=G),f'<span>Saved current ourui/extension state to "{B}"</span>'
 def restore_config_state(confirmed,config_state_name,restore_type):
 	B=config_state_name;A=restore_type
 	if B==_D:return'<span>Select a config to restore from.</span>'
 	if not confirmed:return'<span>Cancelled.</span>'
-	check_access();C=config_states.all_config_states[B];print(f"*** Restoring webui state from backup: {A} ***")
+	check_access();C=config_states.all_config_states[B];print(f"*** Restoring ourui state from backup: {A} ***")
 	if A==_E or A==_I:shared.opts.restore_config_state_file=C[_O];shared.opts.save(shared.config_filename)
-	if A==_F or A==_I:config_states.restore_webui_config(C)
+	if A==_F or A==_I:config_states.restore_ourui_config(C)
 	shared.state.request_restart();return''
 def check_updates(id_task,disable_list):
 	B=disable_list;check_access();C=json.loads(B);assert type(C)==list,f"wrong disable_list data for apply_and_restart: {B}";D=[A for A in extensions.extensions if A.remote is not _B and A.name not in C];shared.state.job_count=len(D)
@@ -114,7 +114,7 @@ def update_config_states_table(state_name):
 		D=A[_F][O]or'';b=A[_F][N];Q=A[_F][M]or C;E=A[_F][X]
 		if E:E=time.asctime(time.gmtime(E))
 		else:E=C
-		R=f'<a href="{html.escape(D)}" target="_blank">{html.escape(D or"")}</a>';S=make_commit_link(Q,D);T=make_commit_link(Q,D,E);U=config_states.get_webui_config();F='';G='';B=''
+		R=f'<a href="{html.escape(D)}" target="_blank">{html.escape(D or"")}</a>';S=make_commit_link(Q,D);T=make_commit_link(Q,D,E);U=config_states.get_ourui_config();F='';G='';B=''
 		if U[O]!=D:F=STYLE_PRIMARY
 		if U[N]!=b:G=STYLE_PRIMARY
 		if U[M]!=Q:B=STYLE_PRIMARY
@@ -123,7 +123,7 @@ def update_config_states_table(state_name):
 <div><b>Filepath:</b> {P}</div>
 <div><b>Created at:</b> {a}</div>
 <h2>WebUI State</h2>
-<table id="config_state_webui">
+<table id="config_state_ourui">
     <thead>
         <tr>
             <th>URL</th>

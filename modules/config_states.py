@@ -1,10 +1,10 @@
-'\nSupports saving and restoring webui and extensions from a known working set of commits\n'
+'\nSupports saving and restoring ourui and extensions from a known working set of commits\n'
 _J='enabled'
 _I='branch'
 _H='commit_date'
 _G='remote'
 _F='extensions'
-_E='webui'
+_E='ourui'
 _D='created_at'
 _C='commit_hash'
 _B=None
@@ -26,11 +26,11 @@ def list_config_states():
 	A=sorted(A,key=lambda cs:cs[_D],reverse=_A)
 	for D in A:H=time.asctime(time.gmtime(D[_D]));I=D.get('name','Config');J=f"{I}: {H}";all_config_states[J]=D
 	return all_config_states
-def get_webui_config():
+def get_ourui_config():
 	A=_B
 	try:
 		if os.path.exists(os.path.join(script_path,'.git')):A=git.Repo(script_path)
-	except Exception:errors.report(f"Error reading webui git info from {script_path}",exc_info=_A)
+	except Exception:errors.report(f"Error reading ourui git info from {script_path}",exc_info=_A)
 	B=_B;C=_B;D=_B;E=_B
 	if A and not A.bare:
 		try:B=next(A.remote().urls,_B);F=A.head.commit;D=A.head.commit.committed_date;C=F.hexsha;E=A.active_branch.name
@@ -40,18 +40,18 @@ def get_extension_config():
 	B={}
 	for A in extensions.extensions:A.read_info_from_repo();C={'name':A.name,'path':A.path,_J:A.enabled,'is_builtin':A.is_builtin,_G:A.remote,_C:A.commit_hash,_H:A.commit_date,_I:A.branch,'have_info_from_repo':A.have_info_from_repo};B[A.name]=C
 	return B
-def get_config():A=datetime.now().timestamp();B=get_webui_config();C=get_extension_config();return{_D:A,_E:B,_F:C}
-def restore_webui_config(config):
-	C=config;print('* Restoring webui state...')
-	if _E not in C:print('Error: No webui data saved to config');return
+def get_config():A=datetime.now().timestamp();B=get_ourui_config();C=get_extension_config();return{_D:A,_E:B,_F:C}
+def restore_ourui_config(config):
+	C=config;print('* Restoring ourui state...')
+	if _E not in C:print('Error: No ourui data saved to config');return
 	D=C[_E]
-	if _C not in D:print('Error: No commit saved to webui config');return
+	if _C not in D:print('Error: No commit saved to ourui config');return
 	A=D.get(_C,_B);B=_B
 	try:
 		if os.path.exists(os.path.join(script_path,'.git')):B=git.Repo(script_path)
-	except Exception:errors.report(f"Error reading webui git info from {script_path}",exc_info=_A);return
-	try:B.git.fetch(all=_A);B.git.reset(A,hard=_A);print(f"* Restored webui to commit {A}.")
-	except Exception:errors.report(f"Error restoring webui to commit{A}")
+	except Exception:errors.report(f"Error reading ourui git info from {script_path}",exc_info=_A);return
+	try:B.git.fetch(all=_A);B.git.reset(A,hard=_A);print(f"* Restored ourui to commit {A}.")
+	except Exception:errors.report(f"Error restoring ourui to commit{A}")
 def restore_extension_config(config):
 	G=config;C=False;print('* Restoring extension state...')
 	if _F not in G:print('Error: No extension data saved to config');return

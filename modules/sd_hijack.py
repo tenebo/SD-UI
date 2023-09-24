@@ -83,7 +83,7 @@ class StandardDemoModelHijack:
 			for C in B:A+=C
 			return A
 		A.layers=H(m)
-		if not hasattr(ldm.modules.diffusionmodules.openaimodel,'copy_of_UNetModel_forward_for_webui'):ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_webui=ldm.modules.diffusionmodules.openaimodel.UNetModel.forward
+		if not hasattr(ldm.modules.diffusionmodules.openaimodel,'copy_of_UNetModel_forward_for_ourui'):ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_ourui=ldm.modules.diffusionmodules.openaimodel.UNetModel.forward
 		ldm.modules.diffusionmodules.openaimodel.UNetModel.forward=sd_unet.UNetModel_forward
 	def undo_hijack(C,m):
 		F='cond_stage_model';B=getattr(m,_C,_A)
@@ -98,7 +98,7 @@ class StandardDemoModelHijack:
 			m.cond_stage_model=m.cond_stage_model.wrapped;E=m.cond_stage_model.transformer.text_model.embeddings
 			if type(E.token_embedding)==EmbeddingsWithFixes:E.token_embedding=E.token_embedding.wrapped
 		elif type(m.cond_stage_model)==sd_hijack_open_clip.FrozenOpenCLIPEmbedderWithCustomWords:m.cond_stage_model.wrapped.model.token_embedding=m.cond_stage_model.wrapped.model.token_embedding.wrapped;m.cond_stage_model=m.cond_stage_model.wrapped
-		undo_optimizations();undo_weighted_forward(m);C.apply_circular(_B);C.layers=_A;C.clip=_A;ldm.modules.diffusionmodules.openaimodel.UNetModel.forward=ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_webui
+		undo_optimizations();undo_weighted_forward(m);C.apply_circular(_B);C.layers=_A;C.clip=_A;ldm.modules.diffusionmodules.openaimodel.UNetModel.forward=ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_ourui
 	def apply_circular(A,enable):
 		B=enable
 		if A.circular_enabled==B:return

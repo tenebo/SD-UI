@@ -100,7 +100,7 @@ def run_modelmerger(id_task,primary_model_name,secondary_model_name,tertiary_mod
 		except Exception as x:errors.display(x,'readin metadata from json')
 		I['format']='pt'
 	if R and add_merge_recipe:
-		y={'type':'webui','primary_model_hash':D.sha256,'secondary_model_hash':E.sha256 if E else _A,'tertiary_model_hash':H.sha256 if H else _A,'interp_method':U,'multiplier':K,'save_as_half':M,'custom_name':T,'config_source':g,'bake_in_vae':f,'discard_weights':S,'is_inpainting':W,'is_instruct_pix2pix':X};b={}
+		y={'type':'ourui','primary_model_hash':D.sha256,'secondary_model_hash':E.sha256 if E else _A,'tertiary_model_hash':H.sha256 if H else _A,'interp_method':U,'multiplier':K,'save_as_half':M,'custom_name':T,'config_source':g,'bake_in_vae':f,'discard_weights':S,'is_inpainting':W,'is_instruct_pix2pix':X};b={}
 		def c(checkpoint_info):A=checkpoint_info;A.calculate_shorthash();b[A.sha256]={'name':A.name,'legacy_hash':A.hash,Q:A.metadata.get(Q,_A)};b.update(A.metadata.get(d,{}))
 		c(D)
 		if E:c(E)

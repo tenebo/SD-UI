@@ -13,6 +13,6 @@ class Script(scripts.Script):
 	def run(self,p,code,indent_level):
 		assert cmd_opts.allow_code,'--allow-code option must be enabled';display_result_data=[[],-1,'']
 		def display(imgs,s=display_result_data[1],i=display_result_data[2]):display_result_data[0]=imgs;display_result_data[1]=s;display_result_data[2]=i
-		from types import ModuleType;module=ModuleType('testmodule');module.__dict__.update(globals());module.p=p;module.display=display;indent=' '*indent_level;indented=code.replace('\n',f"\n{indent}");body=f"def __webuitemp__():\n{indent}{indented}\n__webuitemp__()";result=exec_with_return(body,module)
+		from types import ModuleType;module=ModuleType('testmodule');module.__dict__.update(globals());module.p=p;module.display=display;indent=' '*indent_level;indented=code.replace('\n',f"\n{indent}");body=f"def __ouruitemp__():\n{indent}{indented}\n__ouruitemp__()";result=exec_with_return(body,module)
 		if isinstance(result,Processed):return result
 		return Processed(p,*display_result_data)

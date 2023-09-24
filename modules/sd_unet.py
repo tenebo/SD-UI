@@ -30,4 +30,4 @@ class SdUnet(torch.nn.Module):
 def UNetModel_forward(self,x,timesteps=_A,context=_A,*A,**B):
 	C=context;D=timesteps
 	if current_unet is not _A:return current_unet.forward(x,D,C,*A,**B)
-	return ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_webui(self,x,D,C,*A,**B)
+	return ldm.modules.diffusionmodules.openaimodel.copy_of_UNetModel_forward_for_ourui(self,x,D,C,*A,**B)

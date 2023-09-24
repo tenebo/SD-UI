@@ -323,7 +323,7 @@ def create_ui():
 				if w in shared.opts.hidden_tabs:continue
 				with gr.TabItem(w,id=y,elem_id=f"tab_{y}"):Bq.render()
 				if y not in[AY,AZ]:S.add_block(Bq,y)
-			S.add_component(f"webui/Tabs@{Bp.elem_id}",Bp);S.setup_ui()
+			S.add_component(f"ourui/Tabs@{Bp.elem_id}",Bp);S.setup_ui()
 		if os.path.exists(os.path.join(script_path,AX)):gr.Audio(interactive=_A,value=os.path.join(script_path,AX),elem_id='audio_notification',visible=_A)
 		AW=shared.html('footer.html');AW=AW.format(versions=versions_html(),api_docs='/docs'if shared.cmd_opts.api else'https://github.com/tenebo/standard-demo-we/wiki/API');gr.HTML(AW,elem_id='footer');T.add_functionality(x);Br=lambda:gr.update(visible=shared.sd_model and shared.sd_model.cond_stage_key=='edit');T.text_settings.change(fn=Br,inputs=[],outputs=[v]);x.load(fn=Br,inputs=[],outputs=[v]);BY.setup_ui(dummy_component=C,sd_model_checkpoint_component=T.component_dict[_O])
 	S.dump_defaults();x.ui_loadsave=S;return x
