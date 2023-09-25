@@ -16,7 +16,7 @@ config_unclip=os.path.join(sd_repo_configs_path,'v2-1-stable-unclip-l-inference.
 config_unopenclip=os.path.join(sd_repo_configs_path,'v2-1-stable-unclip-h-inference.yaml')
 config_inpainting=os.path.join(sd_configs_path,'v1-inpainting-inference.yaml')
 config_instruct_pix2pix=os.path.join(sd_configs_path,'instruct-pix2pix.yaml')
-config_alt_diffusion=os.path.join(sd_configs_path,'alt-diffusion-inference.yaml')
+config_alt_diffusion=os.path.join(sd_configs_path,'configx1.yaml')
 def is_using_v_parameterization_for_sd2(state_dict):
 	"\n    Detects whether unet in state_dict is using v-parameterization. Returns True if it is. You're welcome.\n    ";F='model.diffusion_model.';E=False;C=True;import ldm.modules.diffusionmodules.openaimodel;A=devices.cpu
 	with sd_disable_initialization.DisableInitialization():B=ldm.modules.diffusionmodules.openaimodel.UNetModel(use_checkpoint=C,use_fp16=E,image_size=32,in_channels=4,out_channels=4,model_channels=320,attention_resolutions=[4,2,1],num_res_blocks=2,channel_mult=[1,2,4,4],num_head_channels=64,use_spatial_transformer=C,use_linear_in_transformer=C,transformer_depth=1,context_dim=1024,legacy=E);B.eval()

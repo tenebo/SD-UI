@@ -1,6 +1,3 @@
-# File modified by authors of InstructPix2Pix from original (https://github.com/CompVis/stable-diffusion).
-# See more details in LICENSE.
-
 model:
   base_learning_rate: 1.0e-04
   target: modules.models.diffusion.ddpm_edit.LatentDiffusion

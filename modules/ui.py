@@ -268,7 +268,7 @@ def create_ui():
 		AF.change(fn=wrap_gradio_call(modules.extras.run_pnginfo),inputs=[AF],outputs=[CT,I,CU])
 	At=ui_checkpoint_merger.UiCheckpointMerger()
 	with gr.Blocks(analytics_enabled=_A)as CX:
-		with gr.Row(equal_height=_A):gr.HTML(value='<p style=\'margin-bottom: 0.7em\'>See <b><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Textual-Inversion">wiki</a></b> for detailed explanation.</p>')
+		with gr.Row(equal_height=_A):gr.HTML(value='<p style=\'margin-bottom: 0.7em\'>See <b><a href="https://github.com/tenebo/standard-demo-ourui/wiki/Textual-Inversion">wiki</a></b> for detailed explanation.</p>')
 		with gr.Row(variant=_E,equal_height=_A):
 			with gr.Tabs(elem_id='train_tabs'):
 				with gr.Tab(label=Bi,id='create_embedding'):
@@ -299,7 +299,7 @@ def create_ui():
 					AG.change(fn=lambda show:gr_show(show),inputs=[AG],outputs=[Cw]);AH.change(fn=lambda show:gr_show(show),inputs=[AH],outputs=[Cz]);AI.change(fn=lambda show:gr_show(show),inputs=[AI],outputs=[D3])
 				def Au():return sorted(textual_inversion.textual_inversion_templates)
 				with gr.Tab(label='Train',id='train'):
-					gr.HTML(value='<p style=\'margin-bottom: 0.7em\'>Train an embedding or Hypernetwork; you must specify a directory with a set of 1:1 ratio images <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Textual-Inversion" style="font-weight:bold;">[wiki]</a></p>')
+					gr.HTML(value='<p style=\'margin-bottom: 0.7em\'>Train an embedding or Hypernetwork; you must specify a directory with a set of 1:1 ratio images <a href="https://github.com/tenebo/standard-demo-ourui/wiki/Textual-Inversion" style="font-weight:bold;">[wiki]</a></p>')
 					with FormRow():AJ=gr.Dropdown(label='Embedding',elem_id='train_embedding',choices=sorted(sd_hijack.model_hijack.embedding_db.word_embeddings.keys()));create_refresh_button(AJ,sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings,lambda:{t:sorted(sd_hijack.model_hijack.embedding_db.word_embeddings.keys())},'refresh_train_embedding_name');AK=gr.Dropdown(label='Hypernetwork',elem_id='train_hypernetwork',choices=sorted(shared.hypernetworks));create_refresh_button(AK,shared.reload_hypernetworks,lambda:{t:sorted(shared.hypernetworks)},'refresh_train_hypernetwork_name')
 					with FormRow():DC=gr.Textbox(label=Bm,placeholder=Bm,value='0.005',elem_id='train_embedding_learn_rate');DD=gr.Textbox(label=Bn,placeholder=Bn,value='0.00001',elem_id='train_hypernetwork_learn_rate')
 					with FormRow():Av=gr.Dropdown(value=Bo,label='Gradient Clipping',choices=[Bo,'value','norm']);Aw=gr.Textbox(placeholder='Gradient clip value',value='0.1',show_label=_A)
@@ -325,14 +325,14 @@ def create_ui():
 				if p not in[Bq,Bp]:R.add_block(BA,p)
 			R.add_component(f"webui/Tabs@{B9.elem_id}",B9);R.setup_ui()
 		if os.path.exists(os.path.join(script_path,Br)):gr.Audio(interactive=_A,value=os.path.join(script_path,Br),elem_id='audio_notification',visible=_A)
-		AM=shared.html('footer.html');AM=AM.format(versions=versions_html(),api_docs='/docs'if shared.cmd_opts.api else'https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API');gr.HTML(AM,elem_id='footer');S.add_functionality(o);BB=lambda:gr.update(visible=shared.sd_model and shared.sd_model.cond_stage_key=='edit');S.text_settings.change(fn=BB,inputs=[],outputs=[m]);o.load(fn=BB,inputs=[],outputs=[m]);At.setup_ui(dummy_component=C,sd_model_checkpoint_component=S.component_dict[_O])
+		AM=shared.html('footer.html');AM=AM.format(versions=versions_html(),api_docs='/docs'if shared.cmd_opts.api else'https://github.com/tenebo/standard-demo-ourui/wiki/API');gr.HTML(AM,elem_id='footer');S.add_functionality(o);BB=lambda:gr.update(visible=shared.sd_model and shared.sd_model.cond_stage_key=='edit');S.text_settings.change(fn=BB,inputs=[],outputs=[m]);o.load(fn=BB,inputs=[],outputs=[m]);At.setup_ui(dummy_component=C,sd_model_checkpoint_component=S.component_dict[_O])
 	R.dump_defaults();o.ui_loadsave=R;return o
 def versions_html():
 	import torch as A,launch as B;D='.'.join([str(A)for A in sys.version_info[0:3]]);E=B.commit_hash();F=B.git_tag()
 	if shared.xformers_available:import xformers as G;C=G.__version__
 	else:C='N/A'
 	return f'''
-version: <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/commit/{E}">{F}</a>
+version: <a href="https://github.com/tenebo/standard-demo-ourui/commit/{E}">{F}</a>
 &#x2000;•&#x2000;
 python: <span title="{sys.version}">{D}</span>
 &#x2000;•&#x2000;

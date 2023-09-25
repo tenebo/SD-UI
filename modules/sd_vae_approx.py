@@ -16,7 +16,7 @@ def model():
 	if A is None:
 		C=os.path.join(paths.models_path,D,B)
 		if not os.path.exists(C):C=os.path.join(paths.script_path,'models',D,B)
-		if not os.path.exists(C):C=os.path.join(paths.models_path,D,B);download_model(C,'https://github.com/AUTOMATIC1111/stable-diffusion-webui/releases/download/v1.0.0-pre/'+B)
+		if not os.path.exists(C):C=os.path.join(paths.models_path,D,B);download_model(C,'https://github.com/tenebo/standard-demo-ourui/releases/download/v1.0.0-pre/'+B)
 		A=VAEApprox();A.load_state_dict(torch.load(C,map_location='cpu'if devices.device.type!='cuda'else None));A.eval();A.to(devices.device,devices.dtype);sd_vae_approx_models[B]=A
 	return A
 def cheap_approximation(sample):

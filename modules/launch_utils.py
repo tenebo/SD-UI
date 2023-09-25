@@ -34,7 +34,7 @@ and delete current Python and "venv" folder in WebUI\'s directory.
 
 You can download 3.10 Python from here: https://www.python.org/downloads/release/python-3106/
 
-{"Alternatively, use a binary release of WebUI: https://github.com/AUTOMATIC1111/stable-diffusion-webui/releases"if A else""}
+{"Alternatively, use a binary release of WebUI: https://github.com/tenebo/standard-demo-ourui/releases"if A else""}
 
 Use --skip-python-version-check to suppress this warning.
 ''')
@@ -97,7 +97,7 @@ def git_pull_recursive(dir):
 def version_check(commit):
 	E='--------------------------------------------------------';D='sha';C='commit';A=commit
 	try:
-		import requests as F;B=F.get('https://api.github.com/repos/AUTOMATIC1111/stable-diffusion-webui/branches/master').json()
+		import requests as F;B=F.get('https://api.github.com/repos/tenebo/standard-demo-ourui/branches/master').json()
 		if A!=_E and B[C][D]!=A:print(E);print('| You are not up to date with the most recent release. |');print('| Consider running `git pull` to update.               |');print(E)
 		elif B[C][D]==A:print('You are up to date with the most recent release.')
 		else:print("Not a git clone, can't perform version check.")

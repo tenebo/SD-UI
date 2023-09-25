@@ -18,7 +18,7 @@ def display(e,task,*,full_traceback=False):
 	record_exception();print(f"{task or'error'}: {type(e).__name__}",file=sys.stderr);A=traceback.TracebackException.from_exception(e)
 	if full_traceback:A.stack=traceback.StackSummary(traceback.extract_stack()[:-2]+A.stack)
 	print(*A.format(),sep='',file=sys.stderr);B=str(e)
-	if'copying a param with shape torch.Size([640, 1024]) from checkpoint, the shape in current model is torch.Size([640, 768])'in B:print_error_explanation('\nThe most likely cause of this is you are trying to load Stable Diffusion 2.0 model without specifying its config file.\nSee https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features#stable-diffusion-20 for how to solve this.\n        ')
+	if'copying a param with shape torch.Size([640, 1024]) from checkpoint, the shape in current model is torch.Size([640, 768])'in B:print_error_explanation('\nThe most likely cause of this is you are trying to load Stable Diffusion 2.0 model without specifying its config file.\nSee https://github.com/tenebo/standard-demo-ourui/wiki/Features#stable-diffusion-20 for how to solve this.\n        ')
 already_displayed={}
 def display_once(e,task):
 	A=task;record_exception()
