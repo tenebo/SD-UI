@@ -54,7 +54,7 @@ Using a different version of gradio is extremely likely to break the program.
 
 Reasons why you have the mismatched gradio version can be:
   - you use --skip-install flag.
-  - you use webui.py to start the program instead of launch.py.
+  - you use ourui.py to start the program instead of launch.py.
   - an extension installs the incompatible gradio version.
 
 Use --skip-version-check commandline argument to disable this check.

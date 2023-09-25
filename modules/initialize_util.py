@@ -32,7 +32,7 @@ def validate_tls_options():
 	try:
 		if not os.path.exists(A.tls_keyfile):print('Invalid path to TLS keyfile given')
 		if not os.path.exists(A.tls_certfile):print(f"Invalid path to TLS certfile: '{A.tls_certfile}'")
-	except TypeError:A.tls_keyfile=A.tls_certfile=None;print('TLS setup invalid, running webui without TLS')
+	except TypeError:A.tls_keyfile=A.tls_certfile=None;print('TLS setup invalid, running ourui without TLS')
 	else:print('Running with TLS')
 	startup_timer.record('TLS')
 def get_gradio_auth_creds():

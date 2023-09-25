@@ -40,14 +40,14 @@ def apply_and_restart(disable_list,update_list,disable_all):
 def save_config_state(name):
 	A=name;C=config_states.get_config()
 	if not A:A=_N
-	C[_G]=A;D=datetime.now().strftime('%Y_%m_%d-%H_%M_%S');B=os.path.join(config_states_dir,f"{D}_{A}.json");print(f"Saving backup of webui/extension state to {B}.")
+	C[_G]=A;D=datetime.now().strftime('%Y_%m_%d-%H_%M_%S');B=os.path.join(config_states_dir,f"{D}_{A}.json");print(f"Saving backup of ourui/extension state to {B}.")
 	with open(B,'w',encoding='utf-8')as E:json.dump(C,E,indent=4)
-	config_states.list_config_states();F=next(iter(config_states.all_config_states.keys()),_D);G=[_D]+list(config_states.all_config_states.keys());return gr.Dropdown.update(value=F,choices=G),f'<span>Saved current webui/extension state to "{B}"</span>'
+	config_states.list_config_states();F=next(iter(config_states.all_config_states.keys()),_D);G=[_D]+list(config_states.all_config_states.keys());return gr.Dropdown.update(value=F,choices=G),f'<span>Saved current ourui/extension state to "{B}"</span>'
 def restore_config_state(confirmed,config_state_name,restore_type):
 	B=config_state_name;A=restore_type
 	if B==_D:return'<span>Select a config to restore from.</span>'
 	if not confirmed:return'<span>Cancelled.</span>'
-	check_access();C=config_states.all_config_states[B];print(f"*** Restoring webui state from backup: {A} ***")
+	check_access();C=config_states.all_config_states[B];print(f"*** Restoring ourui state from backup: {A} ***")
 	if A==_E or A==_I:shared.opts.restore_config_state_file=C[_O];shared.opts.save(shared.config_filename)
 	if A==_F or A==_I:config_states.restore_webui_config(C)
 	shared.state.request_restart();return''
@@ -122,7 +122,7 @@ def update_config_states_table(state_name):
 <h2>Config Backup: {Y}</h2>
 <div><b>Filepath:</b> {M}</div>
 <div><b>Created at:</b> {Z}</div>
-<h2>WebUI State</h2>
+<h2>OurUI State</h2>
 <table id="config_state_webui">
     <thead>
         <tr>

@@ -50,7 +50,7 @@ class ScriptBuiltinUI(Script):
 	setup_for_ui_only=_B
 	def elem_id(A,item_id):'helper function to generate id for a HTML element, constructs final id out of tab and user-supplied item_id';B=A.show(_B)==A.show(_C);C=(_D if A.is_img2img else _E)+'_'if B else'';return f"{C}{item_id}"
 current_basedir=paths.script_path
-def basedir():"returns the base directory for the current script. For scripts in the main scripts directory,\n    this is the main directory (where webui.py resides), and for scripts in extensions directory\n    (ie extensions/aesthetic/script/aesthetic.py), this is extension's directory (extensions/aesthetic)\n    ";return current_basedir
+def basedir():"returns the base directory for the current script. For scripts in the main scripts directory,\n    this is the main directory (where ourui.py resides), and for scripts in extensions directory\n    (ie extensions/aesthetic/script/aesthetic.py), this is extension's directory (extensions/aesthetic)\n    ";return current_basedir
 ScriptFile=namedtuple('ScriptFile',[_G,'filename','path'])
 scripts_data=[]
 postprocessing_scripts_data=[]

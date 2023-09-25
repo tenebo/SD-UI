@@ -139,7 +139,7 @@ def remove_current_script_callbacks():
 def remove_callbacks_for_function(callback_func):
 	for A in callback_map.values():
 		for B in[A for A in A if A.callback==callback_func]:A.remove(B)
-def on_app_started(callback):'register a function to be called when the webui started, the gradio `Block` component and\n    fastapi `FastAPI` object are passed as the arguments';add_callback(callback_map[_E],callback)
+def on_app_started(callback):'register a function to be called when the ourui started, the gradio `Block` component and\n    fastapi `FastAPI` object are passed as the arguments';add_callback(callback_map[_E],callback)
 def on_before_reload(callback):'register a function to be called just before the server reloads.';add_callback(callback_map[_A],callback)
 def on_model_loaded(callback):'register a function to be called when the stable diffusion model is created; the model is\n    passed as an argument; this function is also called when the script is reloaded. ';add_callback(callback_map[_F],callback)
 def on_ui_tabs(callback):'register a function to be called when the UI is creating new tabs.\n    The function must either return a None, which means no new tabs to be added, or a list, where\n    each element is a tuple:\n        (gradio_component, title, elem_id)\n\n    gradio_component is a gradio component to be used for contents of the tab (usually gr.Blocks)\n    title is tab text displayed to user in the UI\n    elem_id is HTML id for the tab\n    ';add_callback(callback_map[_G],callback)
