@@ -1,134 +1,52 @@
-import base64
-import io
-import time
-
-import gradio as gr
-from pydantic import BaseModel, Field
-
+_B='Live preview image ID'
+_A=None
+import base64,io,time,gradio as gr
+from pydantic import BaseModel,Field
 from modules.shared import opts
-
 import modules.shared as shared
-
-
-current_task = None
-pending_tasks = {}
-finished_tasks = []
-recorded_results = []
-recorded_results_limit = 2
-
-
-def start_task(id_task):
-    global current_task
-
-    current_task = id_task
-    pending_tasks.pop(id_task, None)
-
-
+current_task=_A
+pending_tasks={}
+finished_tasks=[]
+recorded_results=[]
+recorded_results_limit=2
+def start_task(id_task):A=id_task;global current_task;current_task=A;pending_tasks.pop(A,_A)
 def finish_task(id_task):
-    global current_task
-
-    if current_task == id_task:
-        current_task = None
-
-    finished_tasks.append(id_task)
-    if len(finished_tasks) > 16:
-        finished_tasks.pop(0)
-
-
-def record_results(id_task, res):
-    recorded_results.append((id_task, res))
-    if len(recorded_results) > recorded_results_limit:
-        recorded_results.pop(0)
-
-
-def add_task_to_queue(id_job):
-    pending_tasks[id_job] = time.time()
-
-
-class ProgressRequest(BaseModel):
-    id_task: str = Field(default=None, title="Task ID", description="id of the task to get progress for")
-    id_live_preview: int = Field(default=-1, title="Live preview image ID", description="id of last received last preview image")
-    live_preview: bool = Field(default=True, title="Include live preview", description="boolean flag indicating whether to include the live preview image")
-
-
-class ProgressResponse(BaseModel):
-    active: bool = Field(title="Whether the task is being worked on right now")
-    queued: bool = Field(title="Whether the task is in queue")
-    completed: bool = Field(title="Whether the task has already finished")
-    progress: float = Field(default=None, title="Progress", description="The progress with a range of 0 to 1")
-    eta: float = Field(default=None, title="ETA in secs")
-    live_preview: str = Field(default=None, title="Live preview image", description="Current live preview; a data: uri")
-    id_live_preview: int = Field(default=None, title="Live preview image ID", description="Send this together with next request to prevent receiving same image")
-    textinfo: str = Field(default=None, title="Info text", description="Info text used by WebUI.")
-
-
-def setup_progress_api(app):
-    return app.add_api_route("/internal/progress", progressapi, methods=["POST"], response_model=ProgressResponse)
-
-
-def progressapi(req: ProgressRequest):
-    active = req.id_task == current_task
-    queued = req.id_task in pending_tasks
-    completed = req.id_task in finished_tasks
-
-    if not active:
-        textinfo = "Waiting..."
-        if queued:
-            sorted_queued = sorted(pending_tasks.keys(), key=lambda x: pending_tasks[x])
-            queue_index = sorted_queued.index(req.id_task)
-            textinfo = "In queue: {}/{}".format(queue_index + 1, len(sorted_queued))
-        return ProgressResponse(active=active, queued=queued, completed=completed, id_live_preview=-1, textinfo=textinfo)
-
-    progress = 0
-
-    job_count, job_no = shared.state.job_count, shared.state.job_no
-    sampling_steps, sampling_step = shared.state.sampling_steps, shared.state.sampling_step
-
-    if job_count > 0:
-        progress += job_no / job_count
-    if sampling_steps > 0 and job_count > 0:
-        progress += 1 / job_count * sampling_step / sampling_steps
-
-    progress = min(progress, 1)
-
-    elapsed_since_start = time.time() - shared.state.time_start
-    predicted_duration = elapsed_since_start / progress if progress > 0 else None
-    eta = predicted_duration - elapsed_since_start if predicted_duration is not None else None
-
-    live_preview = None
-    id_live_preview = req.id_live_preview
-
-    if opts.live_previews_enable and req.live_preview:
-        shared.state.set_current_image()
-        if shared.state.id_live_preview != req.id_live_preview:
-            image = shared.state.current_image
-            if image is not None:
-                buffered = io.BytesIO()
-
-                if opts.live_previews_image_format == "png":
-                    # using optimize for large images takes an enormous amount of time
-                    if max(*image.size) <= 256:
-                        save_kwargs = {"optimize": True}
-                    else:
-                        save_kwargs = {"optimize": False, "compress_level": 1}
-
-                else:
-                    save_kwargs = {}
-
-                image.save(buffered, format=opts.live_previews_image_format, **save_kwargs)
-                base64_image = base64.b64encode(buffered.getvalue()).decode('ascii')
-                live_preview = f"data:image/{opts.live_previews_image_format};base64,{base64_image}"
-                id_live_preview = shared.state.id_live_preview
-
-    return ProgressResponse(active=active, queued=queued, completed=completed, progress=progress, eta=eta, live_preview=live_preview, id_live_preview=id_live_preview, textinfo=shared.state.textinfo)
-
-
+	A=id_task;global current_task
+	if current_task==A:current_task=_A
+	finished_tasks.append(A)
+	if len(finished_tasks)>16:finished_tasks.pop(0)
+def record_results(id_task,res):
+	recorded_results.append((id_task,res))
+	if len(recorded_results)>recorded_results_limit:recorded_results.pop(0)
+def add_task_to_queue(id_job):pending_tasks[id_job]=time.time()
+class ProgressRequest(BaseModel):id_task=Field(default=_A,title='Task ID',description='id of the task to get progress for');id_live_preview=Field(default=-1,title=_B,description='id of last received last preview image');live_preview=Field(default=True,title='Include live preview',description='boolean flag indicating whether to include the live preview image')
+class ProgressResponse(BaseModel):active=Field(title='Whether the task is being worked on right now');queued=Field(title='Whether the task is in queue');completed=Field(title='Whether the task has already finished');progress=Field(default=_A,title='Progress',description='The progress with a range of 0 to 1');eta=Field(default=_A,title='ETA in secs');live_preview=Field(default=_A,title='Live preview image',description='Current live preview; a data: uri');id_live_preview=Field(default=_A,title=_B,description='Send this together with next request to prevent receiving same image');textinfo=Field(default=_A,title='Info text',description='Info text used by WebUI.')
+def setup_progress_api(app):return app.add_api_route('/internal/progress',progressapi,methods=['POST'],response_model=ProgressResponse)
+def progressapi(req):
+	Q='optimize';A=req;D=A.id_task==current_task;E=A.id_task in pending_tasks;H=A.id_task in finished_tasks
+	if not D:
+		I='Waiting...'
+		if E:J=sorted(pending_tasks.keys(),key=lambda x:pending_tasks[x]);R=J.index(A.id_task);I='In queue: {}/{}'.format(R+1,len(J))
+		return ProgressResponse(active=D,queued=E,completed=H,id_live_preview=-1,textinfo=I)
+	B=0;C,S=shared.state.job_count,shared.state.job_no;K,T=shared.state.sampling_steps,shared.state.sampling_step
+	if C>0:B+=S/C
+	if K>0 and C>0:B+=1/C*T/K
+	B=min(B,1);L=time.time()-shared.state.time_start;M=L/B if B>0 else _A;U=M-L if M is not _A else _A;N=_A;O=A.id_live_preview
+	if opts.live_previews_enable and A.live_preview:
+		shared.state.set_current_image()
+		if shared.state.id_live_preview!=A.id_live_preview:
+			F=shared.state.current_image
+			if F is not _A:
+				P=io.BytesIO()
+				if opts.live_previews_image_format=='png':
+					if max(*F.size)<=256:G={Q:True}
+					else:G={Q:False,'compress_level':1}
+				else:G={}
+				F.save(P,format=opts.live_previews_image_format,**G);V=base64.b64encode(P.getvalue()).decode('ascii');N=f"data:image/{opts.live_previews_image_format};base64,{V}";O=shared.state.id_live_preview
+	return ProgressResponse(active=D,queued=E,completed=H,progress=B,eta=U,live_preview=N,id_live_preview=O,textinfo=shared.state.textinfo)
 def restore_progress(id_task):
-    while id_task == current_task or id_task in pending_tasks:
-        time.sleep(0.1)
-
-    res = next(iter([x[1] for x in recorded_results if id_task == x[0]]), None)
-    if res is not None:
-        return res
-
-    return gr.update(), gr.update(), gr.update(), f"Couldn't restore progress for {id_task}: results either have been discarded or never were obtained"
+	A=id_task
+	while A==current_task or A in pending_tasks:time.sleep(.1)
+	B=next(iter([B[1]for B in recorded_results if A==B[0]]),_A)
+	if B is not _A:return B
+	return gr.update(),gr.update(),gr.update(),f"Couldn't restore progress for {A}: results either have been discarded or never were obtained"

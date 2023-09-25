@@ -1,28 +1,16 @@
 import importlib
-
 class CondFunc:
-    def __new__(cls, orig_func, sub_func, cond_func):
-        self = super(CondFunc, cls).__new__(cls)
-        if isinstance(orig_func, str):
-            func_path = orig_func.split('.')
-            for i in range(len(func_path)-1, -1, -1):
-                try:
-                    resolved_obj = importlib.import_module('.'.join(func_path[:i]))
-                    break
-                except ImportError:
-                    pass
-            for attr_name in func_path[i:-1]:
-                resolved_obj = getattr(resolved_obj, attr_name)
-            orig_func = getattr(resolved_obj, func_path[-1])
-            setattr(resolved_obj, func_path[-1], lambda *args, **kwargs: self(*args, **kwargs))
-        self.__init__(orig_func, sub_func, cond_func)
-        return lambda *args, **kwargs: self(*args, **kwargs)
-    def __init__(self, orig_func, sub_func, cond_func):
-        self.__orig_func = orig_func
-        self.__sub_func = sub_func
-        self.__cond_func = cond_func
-    def __call__(self, *args, **kwargs):
-        if not self.__cond_func or self.__cond_func(self.__orig_func, *args, **kwargs):
-            return self.__sub_func(self.__orig_func, *args, **kwargs)
-        else:
-            return self.__orig_func(*args, **kwargs)
+	def __new__(E,orig_func,sub_func,cond_func):
+		B=orig_func;D=super(CondFunc,E).__new__(E)
+		if isinstance(B,str):
+			A=B.split('.')
+			for F in range(len(A)-1,-1,-1):
+				try:C=importlib.import_module('.'.join(A[:F]));break
+				except ImportError:pass
+			for G in A[F:-1]:C=getattr(C,G)
+			B=getattr(C,A[-1]);setattr(C,A[-1],lambda*A,**B:D(*A,**B))
+		D.__init__(B,sub_func,cond_func);return lambda*A,**B:D(*A,**B)
+	def __init__(A,orig_func,sub_func,cond_func):A.__orig_func=orig_func;A.__sub_func=sub_func;A.__cond_func=cond_func
+	def __call__(A,*B,**C):
+		if not A.__cond_func or A.__cond_func(A.__orig_func,*B,**C):return A.__sub_func(A.__orig_func,*B,**C)
+		else:return A.__orig_func(*B,**C)

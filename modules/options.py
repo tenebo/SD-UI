@@ -1,245 +1,96 @@
-import json
-import sys
-
-import gradio as gr
-
+_C=True
+_B=False
+_A=None
+import json,sys,gradio as gr
 from modules import errors
 from modules.shared_cmd_options import cmd_opts
-
-
 class OptionInfo:
-    def __init__(self, default=None, label="", component=None, component_args=None, onchange=None, section=None, refresh=None, comment_before='', comment_after='', infotext=None, restrict_api=False):
-        self.default = default
-        self.label = label
-        self.component = component
-        self.component_args = component_args
-        self.onchange = onchange
-        self.section = section
-        self.refresh = refresh
-        self.do_not_save = False
-
-        self.comment_before = comment_before
-        """HTML text that will be added after label in UI"""
-
-        self.comment_after = comment_after
-        """HTML text that will be added before label in UI"""
-
-        self.infotext = infotext
-
-        self.restrict_api = restrict_api
-        """If True, the setting will not be accessible via API"""
-
-    def link(self, label, url):
-        self.comment_before += f"[<a href='{url}' target='_blank'>{label}</a>]"
-        return self
-
-    def js(self, label, js_func):
-        self.comment_before += f"[<a onclick='{js_func}(); return false'>{label}</a>]"
-        return self
-
-    def info(self, info):
-        self.comment_after += f"<span class='info'>({info})</span>"
-        return self
-
-    def html(self, html):
-        self.comment_after += html
-        return self
-
-    def needs_restart(self):
-        self.comment_after += " <span class='info'>(requires restart)</span>"
-        return self
-
-    def needs_reload_ui(self):
-        self.comment_after += " <span class='info'>(requires Reload UI)</span>"
-        return self
-
-
+	def __init__(A,default=_A,label='',component=_A,component_args=_A,onchange=_A,section=_A,refresh=_A,comment_before='',comment_after='',infotext=_A,restrict_api=_B):A.default=default;A.label=label;A.component=component;A.component_args=component_args;A.onchange=onchange;A.section=section;A.refresh=refresh;A.do_not_save=_B;A.comment_before=comment_before;'HTML text that will be added after label in UI';A.comment_after=comment_after;'HTML text that will be added before label in UI';A.infotext=infotext;A.restrict_api=restrict_api;'If True, the setting will not be accessible via API'
+	def link(A,label,url):A.comment_before+=f"[<a href='{url}' target='_blank'>{label}</a>]";return A
+	def js(A,label,js_func):A.comment_before+=f"[<a onclick='{js_func}(); return false'>{label}</a>]";return A
+	def info(A,info):A.comment_after+=f"<span class='info'>({info})</span>";return A
+	def html(A,html):A.comment_after+=html;return A
+	def needs_restart(A):A.comment_after+=" <span class='info'>(requires restart)</span>";return A
+	def needs_reload_ui(A):A.comment_after+=" <span class='info'>(requires Reload UI)</span>";return A
 class OptionHTML(OptionInfo):
-    def __init__(self, text):
-        super().__init__(str(text).strip(), label='', component=lambda **kwargs: gr.HTML(elem_classes="settings-info", **kwargs))
-
-        self.do_not_save = True
-
-
-def options_section(section_identifier, options_dict):
-    for v in options_dict.values():
-        v.section = section_identifier
-
-    return options_dict
-
-
-options_builtin_fields = {"data_labels", "data", "restricted_opts", "typemap"}
-
-
+	def __init__(A,text):super().__init__(str(text).strip(),label='',component=lambda**A:gr.HTML(elem_classes='settings-info',**A));A.do_not_save=_C
+def options_section(section_identifier,options_dict):
+	A=options_dict
+	for B in A.values():B.section=section_identifier
+	return A
+options_builtin_fields={'data_labels','data','restricted_opts','typemap'}
 class Options:
-    typemap = {int: float}
-
-    def __init__(self, data_labels: dict[str, OptionInfo], restricted_opts):
-        self.data_labels = data_labels
-        self.data = {k: v.default for k, v in self.data_labels.items()}
-        self.restricted_opts = restricted_opts
-
-    def __setattr__(self, key, value):
-        if key in options_builtin_fields:
-            return super(Options, self).__setattr__(key, value)
-
-        if self.data is not None:
-            if key in self.data or key in self.data_labels:
-                assert not cmd_opts.freeze_settings, "changing settings is disabled"
-
-                info = self.data_labels.get(key, None)
-                if info.do_not_save:
-                    return
-
-                comp_args = info.component_args if info else None
-                if isinstance(comp_args, dict) and comp_args.get('visible', True) is False:
-                    raise RuntimeError(f"not possible to set {key} because it is restricted")
-
-                if cmd_opts.hide_ui_dir_config and key in self.restricted_opts:
-                    raise RuntimeError(f"not possible to set {key} because it is restricted")
-
-                self.data[key] = value
-                return
-
-        return super(Options, self).__setattr__(key, value)
-
-    def __getattr__(self, item):
-        if item in options_builtin_fields:
-            return super(Options, self).__getattribute__(item)
-
-        if self.data is not None:
-            if item in self.data:
-                return self.data[item]
-
-        if item in self.data_labels:
-            return self.data_labels[item].default
-
-        return super(Options, self).__getattribute__(item)
-
-    def set(self, key, value, is_api=False, run_callbacks=True):
-        """sets an option and calls its onchange callback, returning True if the option changed and False otherwise"""
-
-        oldval = self.data.get(key, None)
-        if oldval == value:
-            return False
-
-        option = self.data_labels[key]
-        if option.do_not_save:
-            return False
-
-        if is_api and option.restrict_api:
-            return False
-
-        try:
-            setattr(self, key, value)
-        except RuntimeError:
-            return False
-
-        if run_callbacks and option.onchange is not None:
-            try:
-                option.onchange()
-            except Exception as e:
-                errors.display(e, f"changing setting {key} to {value}")
-                setattr(self, key, oldval)
-                return False
-
-        return True
-
-    def get_default(self, key):
-        """returns the default value for the key"""
-
-        data_label = self.data_labels.get(key)
-        if data_label is None:
-            return None
-
-        return data_label.default
-
-    def save(self, filename):
-        assert not cmd_opts.freeze_settings, "saving settings is disabled"
-
-        with open(filename, "w", encoding="utf8") as file:
-            json.dump(self.data, file, indent=4)
-
-    def same_type(self, x, y):
-        if x is None or y is None:
-            return True
-
-        type_x = self.typemap.get(type(x), type(x))
-        type_y = self.typemap.get(type(y), type(y))
-
-        return type_x == type_y
-
-    def load(self, filename):
-        with open(filename, "r", encoding="utf8") as file:
-            self.data = json.load(file)
-
-        # 1.6.0 VAE defaults
-        if self.data.get('sd_vae_as_default') is not None and self.data.get('sd_vae_overrides_per_model_preferences') is None:
-            self.data['sd_vae_overrides_per_model_preferences'] = not self.data.get('sd_vae_as_default')
-
-        # 1.1.1 quicksettings list migration
-        if self.data.get('quicksettings') is not None and self.data.get('quicksettings_list') is None:
-            self.data['quicksettings_list'] = [i.strip() for i in self.data.get('quicksettings').split(',')]
-
-        # 1.4.0 ui_reorder
-        if isinstance(self.data.get('ui_reorder'), str) and self.data.get('ui_reorder') and "ui_reorder_list" not in self.data:
-            self.data['ui_reorder_list'] = [i.strip() for i in self.data.get('ui_reorder').split(',')]
-
-        bad_settings = 0
-        for k, v in self.data.items():
-            info = self.data_labels.get(k, None)
-            if info is not None and not self.same_type(info.default, v):
-                print(f"Warning: bad setting value: {k}: {v} ({type(v).__name__}; expected {type(info.default).__name__})", file=sys.stderr)
-                bad_settings += 1
-
-        if bad_settings > 0:
-            print(f"The program is likely to not work with bad settings.\nSettings file: {filename}\nEither fix the file, or delete it and restart.", file=sys.stderr)
-
-    def onchange(self, key, func, call=True):
-        item = self.data_labels.get(key)
-        item.onchange = func
-
-        if call:
-            func()
-
-    def dumpjson(self):
-        d = {k: self.data.get(k, v.default) for k, v in self.data_labels.items()}
-        d["_comments_before"] = {k: v.comment_before for k, v in self.data_labels.items() if v.comment_before is not None}
-        d["_comments_after"] = {k: v.comment_after for k, v in self.data_labels.items() if v.comment_after is not None}
-        return json.dumps(d)
-
-    def add_option(self, key, info):
-        self.data_labels[key] = info
-
-    def reorder(self):
-        """reorder settings so that all items related to section always go together"""
-
-        section_ids = {}
-        settings_items = self.data_labels.items()
-        for _, item in settings_items:
-            if item.section not in section_ids:
-                section_ids[item.section] = len(section_ids)
-
-        self.data_labels = dict(sorted(settings_items, key=lambda x: section_ids[x[1].section]))
-
-    def cast_value(self, key, value):
-        """casts an arbitrary to the same type as this setting's value with key
-        Example: cast_value("eta_noise_seed_delta", "12") -> returns 12 (an int rather than str)
-        """
-
-        if value is None:
-            return None
-
-        default_value = self.data_labels[key].default
-        if default_value is None:
-            default_value = getattr(self, key, None)
-        if default_value is None:
-            return None
-
-        expected_type = type(default_value)
-        if expected_type == bool and value == "False":
-            value = False
-        else:
-            value = expected_type(value)
-
-        return value
+	typemap={int:float}
+	def __init__(A,data_labels,restricted_opts):A.data_labels=data_labels;A.data={A:B.default for(A,B)in A.data_labels.items()};A.restricted_opts=restricted_opts
+	def __setattr__(B,key,value):
+		C=value;A=key
+		if A in options_builtin_fields:return super(Options,B).__setattr__(A,C)
+		if B.data is not _A:
+			if A in B.data or A in B.data_labels:
+				assert not cmd_opts.freeze_settings,'changing settings is disabled';D=B.data_labels.get(A,_A)
+				if D.do_not_save:return
+				E=D.component_args if D else _A
+				if isinstance(E,dict)and E.get('visible',_C)is _B:raise RuntimeError(f"not possible to set {A} because it is restricted")
+				if cmd_opts.hide_ui_dir_config and A in B.restricted_opts:raise RuntimeError(f"not possible to set {A} because it is restricted")
+				B.data[A]=C;return
+		return super(Options,B).__setattr__(A,C)
+	def __getattr__(A,item):
+		B=item
+		if B in options_builtin_fields:return super(Options,A).__getattribute__(B)
+		if A.data is not _A:
+			if B in A.data:return A.data[B]
+		if B in A.data_labels:return A.data_labels[B].default
+		return super(Options,A).__getattribute__(B)
+	def set(B,key,value,is_api=_B,run_callbacks=_C):
+		'sets an option and calls its onchange callback, returning True if the option changed and False otherwise';D=value;A=key;E=B.data.get(A,_A)
+		if E==D:return _B
+		C=B.data_labels[A]
+		if C.do_not_save:return _B
+		if is_api and C.restrict_api:return _B
+		try:setattr(B,A,D)
+		except RuntimeError:return _B
+		if run_callbacks and C.onchange is not _A:
+			try:C.onchange()
+			except Exception as F:errors.display(F,f"changing setting {A} to {D}");setattr(B,A,E);return _B
+		return _C
+	def get_default(B,key):
+		'returns the default value for the key';A=B.data_labels.get(key)
+		if A is _A:return
+		return A.default
+	def save(A,filename):
+		assert not cmd_opts.freeze_settings,'saving settings is disabled'
+		with open(filename,'w',encoding='utf8')as B:json.dump(A.data,B,indent=4)
+	def same_type(A,x,y):
+		if x is _A or y is _A:return _C
+		B=A.typemap.get(type(x),type(x));C=A.typemap.get(type(y),type(y));return B==C
+	def load(A,filename):
+		L='ui_reorder_list';K='quicksettings_list';J='quicksettings';I='sd_vae_overrides_per_model_preferences';H='sd_vae_as_default';E=filename;D='ui_reorder'
+		with open(E,'r',encoding='utf8')as M:A.data=json.load(M)
+		if A.data.get(H)is not _A and A.data.get(I)is _A:A.data[I]=not A.data.get(H)
+		if A.data.get(J)is not _A and A.data.get(K)is _A:A.data[K]=[A.strip()for A in A.data.get(J).split(',')]
+		if isinstance(A.data.get(D),str)and A.data.get(D)and L not in A.data:A.data[L]=[A.strip()for A in A.data.get(D).split(',')]
+		F=0
+		for(G,B)in A.data.items():
+			C=A.data_labels.get(G,_A)
+			if C is not _A and not A.same_type(C.default,B):print(f"Warning: bad setting value: {G}: {B} ({type(B).__name__}; expected {type(C.default).__name__})",file=sys.stderr);F+=1
+		if F>0:print(f"The program is likely to not work with bad settings.\nSettings file: {E}\nEither fix the file, or delete it and restart.",file=sys.stderr)
+	def onchange(A,key,func,call=_C):
+		B=A.data_labels.get(key);B.onchange=func
+		if call:func()
+	def dumpjson(A):B={B:A.data.get(B,C.default)for(B,C)in A.data_labels.items()};B['_comments_before']={B:A.comment_before for(B,A)in A.data_labels.items()if A.comment_before is not _A};B['_comments_after']={B:A.comment_after for(B,A)in A.data_labels.items()if A.comment_after is not _A};return json.dumps(B)
+	def add_option(A,key,info):A.data_labels[key]=info
+	def reorder(B):
+		'reorder settings so that all items related to section always go together';A={};C=B.data_labels.items()
+		for(E,D)in C:
+			if D.section not in A:A[D.section]=len(A)
+		B.data_labels=dict(sorted(C,key=lambda x:A[x[1].section]))
+	def cast_value(C,key,value):
+		'casts an arbitrary to the same type as this setting\'s value with key\n        Example: cast_value("eta_noise_seed_delta", "12") -> returns 12 (an int rather than str)\n        ';A=value
+		if A is _A:return
+		B=C.data_labels[key].default
+		if B is _A:B=getattr(C,key,_A)
+		if B is _A:return
+		D=type(B)
+		if D==bool and A=='False':A=_B
+		else:A=D(A)
+		return A

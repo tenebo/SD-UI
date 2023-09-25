@@ -1,31 +1,14 @@
-import os
-import importlib.util
-
+import os,importlib.util
 from modules import errors
-
-
-def load_module(path):
-    module_spec = importlib.util.spec_from_file_location(os.path.basename(path), path)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-
-    return module
-
-
-def preload_extensions(extensions_dir, parser, extension_list=None):
-    if not os.path.isdir(extensions_dir):
-        return
-
-    extensions = extension_list if extension_list is not None else os.listdir(extensions_dir)
-    for dirname in sorted(extensions):
-        preload_script = os.path.join(extensions_dir, dirname, "preload.py")
-        if not os.path.isfile(preload_script):
-            continue
-
-        try:
-            module = load_module(preload_script)
-            if hasattr(module, 'preload'):
-                module.preload(parser)
-
-        except Exception:
-            errors.report(f"Error running preload() for {preload_script}", exc_info=True)
+def load_module(path):A=importlib.util.spec_from_file_location(os.path.basename(path),path);B=importlib.util.module_from_spec(A);A.loader.exec_module(B);return B
+def preload_extensions(extensions_dir,parser,extension_list=None):
+	C=extension_list;A=extensions_dir
+	if not os.path.isdir(A):return
+	E=C if C is not None else os.listdir(A)
+	for F in sorted(E):
+		B=os.path.join(A,F,'preload.py')
+		if not os.path.isfile(B):continue
+		try:
+			D=load_module(B)
+			if hasattr(D,'preload'):D.preload(parser)
+		except Exception:errors.report(f"Error running preload() for {B}",exc_info=True)

@@ -1,86 +1,36 @@
-import torch
-
-import lyco_helpers
-import network
+_D='lora_mid.weight'
+_C='lora_up.weight'
+_B='lora_down.weight'
+_A=False
+import torch,lyco_helpers,network
 from modules import devices
-
-
 class ModuleTypeLora(network.ModuleType):
-    def create_module(self, net: network.Network, weights: network.NetworkWeights):
-        if all(x in weights.w for x in ["lora_up.weight", "lora_down.weight"]):
-            return NetworkModuleLora(net, weights)
-
-        return None
-
-
+	def create_module(B,net,weights):
+		A=weights
+		if all(B in A.w for B in[_C,_B]):return NetworkModuleLora(net,A)
 class NetworkModuleLora(network.NetworkModule):
-    def __init__(self,  net: network.Network, weights: network.NetworkWeights):
-        super().__init__(net, weights)
-
-        self.up_model = self.create_module(weights.w, "lora_up.weight")
-        self.down_model = self.create_module(weights.w, "lora_down.weight")
-        self.mid_model = self.create_module(weights.w, "lora_mid.weight", none_ok=True)
-
-        self.dim = weights.w["lora_down.weight"].shape[0]
-
-    def create_module(self, weights, key, none_ok=False):
-        weight = weights.get(key)
-
-        if weight is None and none_ok:
-            return None
-
-        is_linear = type(self.sd_module) in [torch.nn.Linear, torch.nn.modules.linear.NonDynamicallyQuantizableLinear, torch.nn.MultiheadAttention]
-        is_conv = type(self.sd_module) in [torch.nn.Conv2d]
-
-        if is_linear:
-            weight = weight.reshape(weight.shape[0], -1)
-            module = torch.nn.Linear(weight.shape[1], weight.shape[0], bias=False)
-        elif is_conv and key == "lora_down.weight" or key == "dyn_up":
-            if len(weight.shape) == 2:
-                weight = weight.reshape(weight.shape[0], -1, 1, 1)
-
-            if weight.shape[2] != 1 or weight.shape[3] != 1:
-                module = torch.nn.Conv2d(weight.shape[1], weight.shape[0], self.sd_module.kernel_size, self.sd_module.stride, self.sd_module.padding, bias=False)
-            else:
-                module = torch.nn.Conv2d(weight.shape[1], weight.shape[0], (1, 1), bias=False)
-        elif is_conv and key == "lora_mid.weight":
-            module = torch.nn.Conv2d(weight.shape[1], weight.shape[0], self.sd_module.kernel_size, self.sd_module.stride, self.sd_module.padding, bias=False)
-        elif is_conv and key == "lora_up.weight" or key == "dyn_down":
-            module = torch.nn.Conv2d(weight.shape[1], weight.shape[0], (1, 1), bias=False)
-        else:
-            raise AssertionError(f'Lora layer {self.network_key} matched a layer with unsupported type: {type(self.sd_module).__name__}')
-
-        with torch.no_grad():
-            if weight.shape != module.weight.shape:
-                weight = weight.reshape(module.weight.shape)
-            module.weight.copy_(weight)
-
-        module.to(device=devices.cpu, dtype=devices.dtype)
-        module.weight.requires_grad_(False)
-
-        return module
-
-    def calc_updown(self, orig_weight):
-        up = self.up_model.weight.to(orig_weight.device, dtype=orig_weight.dtype)
-        down = self.down_model.weight.to(orig_weight.device, dtype=orig_weight.dtype)
-
-        output_shape = [up.size(0), down.size(1)]
-        if self.mid_model is not None:
-            # cp-decomposition
-            mid = self.mid_model.weight.to(orig_weight.device, dtype=orig_weight.dtype)
-            updown = lyco_helpers.rebuild_cp_decomposition(up, down, mid)
-            output_shape += mid.shape[2:]
-        else:
-            if len(down.shape) == 4:
-                output_shape += down.shape[2:]
-            updown = lyco_helpers.rebuild_conventional(up, down, output_shape, self.network.dyn_dim)
-
-        return self.finalize_updown(updown, orig_weight, output_shape)
-
-    def forward(self, x, y):
-        self.up_model.to(device=devices.device)
-        self.down_model.to(device=devices.device)
-
-        return y + self.up_model(self.down_model(x)) * self.multiplier() * self.calc_scale()
-
-
+	def __init__(A,net,weights):B=weights;super().__init__(net,B);A.up_model=A.create_module(B.w,_C);A.down_model=A.create_module(B.w,_B);A.mid_model=A.create_module(B.w,_D,none_ok=True);A.dim=B.w[_B].shape[0]
+	def create_module(B,weights,key,none_ok=_A):
+		D=key;A=weights.get(D)
+		if A is None and none_ok:return
+		F=type(B.sd_module)in[torch.nn.Linear,torch.nn.modules.linear.NonDynamicallyQuantizableLinear,torch.nn.MultiheadAttention];E=type(B.sd_module)in[torch.nn.Conv2d]
+		if F:A=A.reshape(A.shape[0],-1);C=torch.nn.Linear(A.shape[1],A.shape[0],bias=_A)
+		elif E and D==_B or D=='dyn_up':
+			if len(A.shape)==2:A=A.reshape(A.shape[0],-1,1,1)
+			if A.shape[2]!=1 or A.shape[3]!=1:C=torch.nn.Conv2d(A.shape[1],A.shape[0],B.sd_module.kernel_size,B.sd_module.stride,B.sd_module.padding,bias=_A)
+			else:C=torch.nn.Conv2d(A.shape[1],A.shape[0],(1,1),bias=_A)
+		elif E and D==_D:C=torch.nn.Conv2d(A.shape[1],A.shape[0],B.sd_module.kernel_size,B.sd_module.stride,B.sd_module.padding,bias=_A)
+		elif E and D==_C or D=='dyn_down':C=torch.nn.Conv2d(A.shape[1],A.shape[0],(1,1),bias=_A)
+		else:raise AssertionError(f"Lora layer {B.network_key} matched a layer with unsupported type: {type(B.sd_module).__name__}")
+		with torch.no_grad():
+			if A.shape!=C.weight.shape:A=A.reshape(C.weight.shape)
+			C.weight.copy_(A)
+		C.to(device=devices.cpu,dtype=devices.dtype);C.weight.requires_grad_(_A);return C
+	def calc_updown(B,orig_weight):
+		A=orig_weight;E=B.up_model.weight.to(A.device,dtype=A.dtype);C=B.down_model.weight.to(A.device,dtype=A.dtype);D=[E.size(0),C.size(1)]
+		if B.mid_model is not None:F=B.mid_model.weight.to(A.device,dtype=A.dtype);G=lyco_helpers.rebuild_cp_decomposition(E,C,F);D+=F.shape[2:]
+		else:
+			if len(C.shape)==4:D+=C.shape[2:]
+			G=lyco_helpers.rebuild_conventional(E,C,D,B.network.dyn_dim)
+		return B.finalize_updown(G,A,D)
+	def forward(A,x,y):A.up_model.to(device=devices.device);A.down_model.to(device=devices.device);return y+A.up_model(A.down_model(x))*A.multiplier()*A.calc_scale()

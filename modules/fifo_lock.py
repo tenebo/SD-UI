@@ -1,37 +1,17 @@
-import threading
-import collections
-
-
-# reference: https://gist.github.com/vitaliyp/6d54dd76ca2c3cdfc1149d33007dc34a
-class FIFOLock(object):
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._inner_lock = threading.Lock()
-        self._pending_threads = collections.deque()
-
-    def acquire(self, blocking=True):
-        with self._inner_lock:
-            lock_acquired = self._lock.acquire(False)
-            if lock_acquired:
-                return True
-            elif not blocking:
-                return False
-
-            release_event = threading.Event()
-            self._pending_threads.append(release_event)
-
-        release_event.wait()
-        return self._lock.acquire()
-
-    def release(self):
-        with self._inner_lock:
-            if self._pending_threads:
-                release_event = self._pending_threads.popleft()
-                release_event.set()
-
-            self._lock.release()
-
-    __enter__ = acquire
-
-    def __exit__(self, t, v, tb):
-        self.release()
+import threading,collections
+class FIFOLock:
+	def __init__(A):A._lock=threading.Lock();A._inner_lock=threading.Lock();A._pending_threads=collections.deque()
+	def acquire(A,blocking=True):
+		C=False
+		with A._inner_lock:
+			D=A._lock.acquire(C)
+			if D:return True
+			elif not blocking:return C
+			B=threading.Event();A._pending_threads.append(B)
+		B.wait();return A._lock.acquire()
+	def release(A):
+		with A._inner_lock:
+			if A._pending_threads:B=A._pending_threads.popleft();B.set()
+			A._lock.release()
+	__enter__=acquire
+	def __exit__(A,t,v,tb):A.release()

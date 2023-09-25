@@ -1,10 +1,2 @@
 import os.path
-
-
-def should_hijack_ip2p(checkpoint_info):
-    from modules import sd_models_config
-
-    ckpt_basename = os.path.basename(checkpoint_info.filename).lower()
-    cfg_basename = os.path.basename(sd_models_config.find_checkpoint_config_near_filename(checkpoint_info)).lower()
-
-    return "pix2pix" in ckpt_basename and "pix2pix" not in cfg_basename
+def should_hijack_ip2p(checkpoint_info):B='pix2pix';A=checkpoint_info;from modules import sd_models_config as C;D=os.path.basename(A.filename).lower();E=os.path.basename(C.find_checkpoint_config_near_filename(A)).lower();return B in D and B not in E

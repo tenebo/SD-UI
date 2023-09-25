@@ -1,146 +1,41 @@
-import math
-
-import modules.scripts as scripts
-import gradio as gr
-from PIL import Image, ImageDraw
-
-from modules import images, devices
-from modules.processing import Processed, process_images
-from modules.shared import opts, state
-
-
+_C='down'
+_B='right'
+_A='left'
+import math,modules.scripts as scripts,gradio as gr
+from PIL import Image,ImageDraw
+from modules import images,devices
+from modules.processing import Processed,process_images
+from modules.shared import opts,state
 class Script(scripts.Script):
-    def title(self):
-        return "Poor man's outpainting"
-
-    def show(self, is_img2img):
-        return is_img2img
-
-    def ui(self, is_img2img):
-        if not is_img2img:
-            return None
-
-        pixels = gr.Slider(label="Pixels to expand", minimum=8, maximum=256, step=8, value=128, elem_id=self.elem_id("pixels"))
-        mask_blur = gr.Slider(label='Mask blur', minimum=0, maximum=64, step=1, value=4, elem_id=self.elem_id("mask_blur"))
-        inpainting_fill = gr.Radio(label='Masked content', choices=['fill', 'original', 'latent noise', 'latent nothing'], value='fill', type="index", elem_id=self.elem_id("inpainting_fill"))
-        direction = gr.CheckboxGroup(label="Outpainting direction", choices=['left', 'right', 'up', 'down'], value=['left', 'right', 'up', 'down'], elem_id=self.elem_id("direction"))
-
-        return [pixels, mask_blur, inpainting_fill, direction]
-
-    def run(self, p, pixels, mask_blur, inpainting_fill, direction):
-        initial_seed = None
-        initial_info = None
-
-        p.mask_blur = mask_blur * 2
-        p.inpainting_fill = inpainting_fill
-        p.inpaint_full_res = False
-
-        left = pixels if "left" in direction else 0
-        right = pixels if "right" in direction else 0
-        up = pixels if "up" in direction else 0
-        down = pixels if "down" in direction else 0
-
-        init_img = p.init_images[0]
-        target_w = math.ceil((init_img.width + left + right) / 64) * 64
-        target_h = math.ceil((init_img.height + up + down) / 64) * 64
-
-        if left > 0:
-            left = left * (target_w - init_img.width) // (left + right)
-        if right > 0:
-            right = target_w - init_img.width - left
-
-        if up > 0:
-            up = up * (target_h - init_img.height) // (up + down)
-
-        if down > 0:
-            down = target_h - init_img.height - up
-
-        img = Image.new("RGB", (target_w, target_h))
-        img.paste(init_img, (left, up))
-
-        mask = Image.new("L", (img.width, img.height), "white")
-        draw = ImageDraw.Draw(mask)
-        draw.rectangle((
-            left + (mask_blur * 2 if left > 0 else 0),
-            up + (mask_blur * 2 if up > 0 else 0),
-            mask.width - right - (mask_blur * 2 if right > 0 else 0),
-            mask.height - down - (mask_blur * 2 if down > 0 else 0)
-        ), fill="black")
-
-        latent_mask = Image.new("L", (img.width, img.height), "white")
-        latent_draw = ImageDraw.Draw(latent_mask)
-        latent_draw.rectangle((
-             left + (mask_blur//2 if left > 0 else 0),
-             up + (mask_blur//2 if up > 0 else 0),
-             mask.width - right - (mask_blur//2 if right > 0 else 0),
-             mask.height - down - (mask_blur//2 if down > 0 else 0)
-        ), fill="black")
-
-        devices.torch_gc()
-
-        grid = images.split_grid(img, tile_w=p.width, tile_h=p.height, overlap=pixels)
-        grid_mask = images.split_grid(mask, tile_w=p.width, tile_h=p.height, overlap=pixels)
-        grid_latent_mask = images.split_grid(latent_mask, tile_w=p.width, tile_h=p.height, overlap=pixels)
-
-        p.n_iter = 1
-        p.batch_size = 1
-        p.do_not_save_grid = True
-        p.do_not_save_samples = True
-
-        work = []
-        work_mask = []
-        work_latent_mask = []
-        work_results = []
-
-        for (y, h, row), (_, _, row_mask), (_, _, row_latent_mask) in zip(grid.tiles, grid_mask.tiles, grid_latent_mask.tiles):
-            for tiledata, tiledata_mask, tiledata_latent_mask in zip(row, row_mask, row_latent_mask):
-                x, w = tiledata[0:2]
-
-                if x >= left and x+w <= img.width - right and y >= up and y+h <= img.height - down:
-                    continue
-
-                work.append(tiledata[2])
-                work_mask.append(tiledata_mask[2])
-                work_latent_mask.append(tiledata_latent_mask[2])
-
-        batch_count = len(work)
-        print(f"Poor man's outpainting will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)}.")
-
-        state.job_count = batch_count
-
-        for i in range(batch_count):
-            p.init_images = [work[i]]
-            p.image_mask = work_mask[i]
-            p.latent_mask = work_latent_mask[i]
-
-            state.job = f"Batch {i + 1} out of {batch_count}"
-            processed = process_images(p)
-
-            if initial_seed is None:
-                initial_seed = processed.seed
-                initial_info = processed.info
-
-            p.seed = processed.seed + 1
-            work_results += processed.images
-
-
-        image_index = 0
-        for y, h, row in grid.tiles:
-            for tiledata in row:
-                x, w = tiledata[0:2]
-
-                if x >= left and x+w <= img.width - right and y >= up and y+h <= img.height - down:
-                    continue
-
-                tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (p.width, p.height))
-                image_index += 1
-
-        combined_image = images.combine_grid(grid)
-
-        if opts.samples_save:
-            images.save_image(combined_image, p.outpath_samples, "", initial_seed, p.prompt, opts.samples_format, info=initial_info, p=p)
-
-        processed = Processed(p, [combined_image], initial_seed, initial_info)
-
-        return processed
-
+	def title(A):return"Poor man's outpainting"
+	def show(A,is_img2img):return is_img2img
+	def ui(A,is_img2img):
+		B='fill'
+		if not is_img2img:return
+		C=gr.Slider(label='Pixels to expand',minimum=8,maximum=256,step=8,value=128,elem_id=A.elem_id('pixels'));D=gr.Slider(label='Mask blur',minimum=0,maximum=64,step=1,value=4,elem_id=A.elem_id('mask_blur'));E=gr.Radio(label='Masked content',choices=[B,'original','latent noise','latent nothing'],value=B,type='index',elem_id=A.elem_id('inpainting_fill'));F=gr.CheckboxGroup(label='Outpainting direction',choices=[_A,_B,'up',_C],value=[_A,_B,'up',_C],elem_id=A.elem_id('direction'));return[C,D,E,F]
+	def run(t,p,pixels,mask_blur,inpainting_fill,direction):
+		j='black';i='white';h='RGB';c=None;O=direction;G=pixels;F=mask_blur;P=c;S=c;p.mask_blur=F*2;p.inpainting_fill=inpainting_fill;p.inpaint_full_res=False;A=G if _A in O else 0;C=G if _B in O else 0;B=G if'up'in O else 0;D=G if _C in O else 0;H=p.init_images[0];T=math.ceil((H.width+A+C)/64)*64;U=math.ceil((H.height+B+D)/64)*64
+		if A>0:A=A*(T-H.width)//(A+C)
+		if C>0:C=T-H.width-A
+		if B>0:B=B*(U-H.height)//(B+D)
+		if D>0:D=U-H.height-B
+		E=Image.new(h,(T,U));E.paste(H,(A,B));I=Image.new('L',(E.width,E.height),i);k=ImageDraw.Draw(I);k.rectangle((A+(F*2 if A>0 else 0),B+(F*2 if B>0 else 0),I.width-C-(F*2 if C>0 else 0),I.height-D-(F*2 if D>0 else 0)),fill=j);d=Image.new('L',(E.width,E.height),i);l=ImageDraw.Draw(d);l.rectangle((A+(F//2 if A>0 else 0),B+(F//2 if B>0 else 0),I.width-C-(F//2 if C>0 else 0),I.height-D-(F//2 if D>0 else 0)),fill=j);devices.torch_gc();K=images.split_grid(E,tile_w=p.width,tile_h=p.height,overlap=G);m=images.split_grid(I,tile_w=p.width,tile_h=p.height,overlap=G);n=images.split_grid(d,tile_w=p.width,tile_h=p.height,overlap=G);p.n_iter=1;p.batch_size=1;p.do_not_save_grid=True;p.do_not_save_samples=True;Q=[];e=[];f=[];V=[]
+		for((L,W,X),(Y,Y,o),(Y,Y,q))in zip(K.tiles,m.tiles,n.tiles):
+			for(M,r,s)in zip(X,o,q):
+				N,Z=M[0:2]
+				if N>=A and N+Z<=E.width-C and L>=B and L+W<=E.height-D:continue
+				Q.append(M[2]);e.append(r[2]);f.append(s[2])
+		a=len(Q);print(f"Poor man's outpainting will process a total of {len(Q)} images tiled as {len(K.tiles[0][2])}x{len(K.tiles)}.");state.job_count=a
+		for R in range(a):
+			p.init_images=[Q[R]];p.image_mask=e[R];p.latent_mask=f[R];state.job=f"Batch {R+1} out of {a}";J=process_images(p)
+			if P is c:P=J.seed;S=J.info
+			p.seed=J.seed+1;V+=J.images
+		b=0
+		for(L,W,X)in K.tiles:
+			for M in X:
+				N,Z=M[0:2]
+				if N>=A and N+Z<=E.width-C and L>=B and L+W<=E.height-D:continue
+				M[2]=V[b]if b<len(V)else Image.new(h,(p.width,p.height));b+=1
+		g=images.combine_grid(K)
+		if opts.samples_save:images.save_image(g,p.outpath_samples,'',P,p.prompt,opts.samples_format,info=S,p=p)
+		J=Processed(p,[g],P,S);return J

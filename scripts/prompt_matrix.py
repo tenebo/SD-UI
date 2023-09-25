@@ -1,108 +1,41 @@
-import math
-
-import modules.scripts as scripts
-import gradio as gr
-
+_C='negative'
+_B='comma'
+_A='positive'
+import math,modules.scripts as scripts,gradio as gr
 from modules import images
 from modules.processing import process_images
-from modules.shared import opts, state
+from modules.shared import opts,state
 import modules.sd_samplers
-
-
-def draw_xy_grid(xs, ys, x_label, y_label, cell):
-    res = []
-
-    ver_texts = [[images.GridAnnotation(y_label(y))] for y in ys]
-    hor_texts = [[images.GridAnnotation(x_label(x))] for x in xs]
-
-    first_processed = None
-
-    state.job_count = len(xs) * len(ys)
-
-    for iy, y in enumerate(ys):
-        for ix, x in enumerate(xs):
-            state.job = f"{ix + iy * len(xs) + 1} out of {len(xs) * len(ys)}"
-
-            processed = cell(x, y)
-            if first_processed is None:
-                first_processed = processed
-
-            res.append(processed.images[0])
-
-    grid = images.image_grid(res, rows=len(ys))
-    grid = images.draw_grid_annotations(grid, res[0].width, res[0].height, hor_texts, ver_texts)
-
-    first_processed.images = [grid]
-
-    return first_processed
-
-
+def draw_xy_grid(xs,ys,x_label,y_label,cell):
+	B=ys;A=xs;C=[];G=[[images.GridAnnotation(y_label(A))]for A in B];H=[[images.GridAnnotation(x_label(A))]for A in A];D=None;state.job_count=len(A)*len(B)
+	for(I,J)in enumerate(B):
+		for(K,L)in enumerate(A):
+			state.job=f"{K+I*len(A)+1} out of {len(A)*len(B)}";F=cell(L,J)
+			if D is None:D=F
+			C.append(F.images[0])
+	E=images.image_grid(C,rows=len(B));E=images.draw_grid_annotations(E,C[0].width,C[0].height,H,G);D.images=[E];return D
 class Script(scripts.Script):
-    def title(self):
-        return "Prompt matrix"
-
-    def ui(self, is_img2img):
-        gr.HTML('<br />')
-        with gr.Row():
-            with gr.Column():
-                put_at_start = gr.Checkbox(label='Put variable parts at start of prompt', value=False, elem_id=self.elem_id("put_at_start"))
-                different_seeds = gr.Checkbox(label='Use different seed for each picture', value=False, elem_id=self.elem_id("different_seeds"))
-            with gr.Column():
-                prompt_type = gr.Radio(["positive", "negative"], label="Select prompt", elem_id=self.elem_id("prompt_type"), value="positive")
-                variations_delimiter = gr.Radio(["comma", "space"], label="Select joining char", elem_id=self.elem_id("variations_delimiter"), value="comma")
-            with gr.Column():
-                margin_size = gr.Slider(label="Grid margins (px)", minimum=0, maximum=500, value=0, step=2, elem_id=self.elem_id("margin_size"))
-
-        return [put_at_start, different_seeds, prompt_type, variations_delimiter, margin_size]
-
-    def run(self, p, put_at_start, different_seeds, prompt_type, variations_delimiter, margin_size):
-        modules.processing.fix_seed(p)
-        # Raise error if promp type is not positive or negative
-        if prompt_type not in ["positive", "negative"]:
-            raise ValueError(f"Unknown prompt type {prompt_type}")
-        # Raise error if variations delimiter is not comma or space
-        if variations_delimiter not in ["comma", "space"]:
-            raise ValueError(f"Unknown variations delimiter {variations_delimiter}")
-
-        prompt = p.prompt if prompt_type == "positive" else p.negative_prompt
-        original_prompt = prompt[0] if type(prompt) == list else prompt
-        positive_prompt = p.prompt[0] if type(p.prompt) == list else p.prompt
-
-        delimiter = ", " if variations_delimiter == "comma" else " "
-
-        all_prompts = []
-        prompt_matrix_parts = original_prompt.split("|")
-        combination_count = 2 ** (len(prompt_matrix_parts) - 1)
-        for combination_num in range(combination_count):
-            selected_prompts = [text.strip().strip(',') for n, text in enumerate(prompt_matrix_parts[1:]) if combination_num & (1 << n)]
-
-            if put_at_start:
-                selected_prompts = selected_prompts + [prompt_matrix_parts[0]]
-            else:
-                selected_prompts = [prompt_matrix_parts[0]] + selected_prompts
-
-            all_prompts.append(delimiter.join(selected_prompts))
-
-        p.n_iter = math.ceil(len(all_prompts) / p.batch_size)
-        p.do_not_save_grid = True
-
-        print(f"Prompt matrix will create {len(all_prompts)} images using a total of {p.n_iter} batches.")
-
-        if prompt_type == "positive":
-            p.prompt = all_prompts
-        else:
-            p.negative_prompt = all_prompts
-        p.seed = [p.seed + (i if different_seeds else 0) for i in range(len(all_prompts))]
-        p.prompt_for_display = positive_prompt
-        processed = process_images(p)
-
-        grid = images.image_grid(processed.images, p.batch_size, rows=1 << ((len(prompt_matrix_parts) - 1) // 2))
-        grid = images.draw_prompt_matrix(grid, processed.images[0].width, processed.images[0].height, prompt_matrix_parts, margin_size)
-        processed.images.insert(0, grid)
-        processed.index_of_first_image = 1
-        processed.infotexts.insert(0, processed.infotexts[0])
-
-        if opts.grid_save:
-            images.save_image(processed.images[0], p.outpath_grids, "prompt_matrix", extension=opts.grid_format, prompt=original_prompt, seed=processed.seed, grid=True, p=p)
-
-        return processed
+	def title(A):return'Prompt matrix'
+	def ui(A,is_img2img):
+		B=False;gr.HTML('<br />')
+		with gr.Row():
+			with gr.Column():C=gr.Checkbox(label='Put variable parts at start of prompt',value=B,elem_id=A.elem_id('put_at_start'));D=gr.Checkbox(label='Use different seed for each picture',value=B,elem_id=A.elem_id('different_seeds'))
+			with gr.Column():E=gr.Radio([_A,_C],label='Select prompt',elem_id=A.elem_id('prompt_type'),value=_A);F=gr.Radio([_B,'space'],label='Select joining char',elem_id=A.elem_id('variations_delimiter'),value=_B)
+			with gr.Column():G=gr.Slider(label='Grid margins (px)',minimum=0,maximum=500,value=0,step=2,elem_id=A.elem_id('margin_size'))
+		return[C,D,E,F,G]
+	def run(N,p,put_at_start,different_seeds,prompt_type,variations_delimiter,margin_size):
+		F=variations_delimiter;E=prompt_type;modules.processing.fix_seed(p)
+		if E not in[_A,_C]:raise ValueError(f"Unknown prompt type {E}")
+		if F not in[_B,'space']:raise ValueError(f"Unknown variations delimiter {F}")
+		G=p.prompt if E==_A else p.negative_prompt;I=G[0]if type(G)==list else G;J=p.prompt[0]if type(p.prompt)==list else p.prompt;K=', 'if F==_B else' ';B=[];C=I.split('|');L=2**(len(C)-1)
+		for M in range(L):
+			D=[B.strip().strip(',')for(A,B)in enumerate(C[1:])if M&1<<A]
+			if put_at_start:D=D+[C[0]]
+			else:D=[C[0]]+D
+			B.append(K.join(D))
+		p.n_iter=math.ceil(len(B)/p.batch_size);p.do_not_save_grid=True;print(f"Prompt matrix will create {len(B)} images using a total of {p.n_iter} batches.")
+		if E==_A:p.prompt=B
+		else:p.negative_prompt=B
+		p.seed=[p.seed+(A if different_seeds else 0)for A in range(len(B))];p.prompt_for_display=J;A=process_images(p);H=images.image_grid(A.images,p.batch_size,rows=1<<(len(C)-1)//2);H=images.draw_prompt_matrix(H,A.images[0].width,A.images[0].height,C,margin_size);A.images.insert(0,H);A.index_of_first_image=1;A.infotexts.insert(0,A.infotexts[0])
+		if opts.grid_save:images.save_image(A.images[0],p.outpath_grids,'prompt_matrix',extension=opts.grid_format,prompt=I,seed=A.seed,grid=True,p=p)
+		return A

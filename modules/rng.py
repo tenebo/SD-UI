@@ -1,170 +1,61 @@
+_D='mps'
+_C='CPU'
+_B='NV'
+_A=None
 import torch
-
-from modules import devices, rng_philox, shared
-
-
-def randn(seed, shape, generator=None):
-    """Generate a tensor with random numbers from a normal distribution using seed.
-
-    Uses the seed parameter to set the global torch seed; to generate more with that seed, use randn_like/randn_without_seed."""
-
-    manual_seed(seed)
-
-    if shared.opts.randn_source == "NV":
-        return torch.asarray((generator or nv_rng).randn(shape), device=devices.device)
-
-    if shared.opts.randn_source == "CPU" or devices.device.type == 'mps':
-        return torch.randn(shape, device=devices.cpu, generator=generator).to(devices.device)
-
-    return torch.randn(shape, device=devices.device, generator=generator)
-
-
-def randn_local(seed, shape):
-    """Generate a tensor with random numbers from a normal distribution using seed.
-
-    Does not change the global random number generator. You can only generate the seed's first tensor using this function."""
-
-    if shared.opts.randn_source == "NV":
-        rng = rng_philox.Generator(seed)
-        return torch.asarray(rng.randn(shape), device=devices.device)
-
-    local_device = devices.cpu if shared.opts.randn_source == "CPU" or devices.device.type == 'mps' else devices.device
-    local_generator = torch.Generator(local_device).manual_seed(int(seed))
-    return torch.randn(shape, device=local_device, generator=local_generator).to(devices.device)
-
-
+from modules import devices,rng_philox,shared
+def randn(seed,shape,generator=_A):
+	'Generate a tensor with random numbers from a normal distribution using seed.\n\n    Uses the seed parameter to set the global torch seed; to generate more with that seed, use randn_like/randn_without_seed.';B=generator;A=shape;manual_seed(seed)
+	if shared.opts.randn_source==_B:return torch.asarray((B or nv_rng).randn(A),device=devices.device)
+	if shared.opts.randn_source==_C or devices.device.type==_D:return torch.randn(A,device=devices.cpu,generator=B).to(devices.device)
+	return torch.randn(A,device=devices.device,generator=B)
+def randn_local(seed,shape):
+	"Generate a tensor with random numbers from a normal distribution using seed.\n\n    Does not change the global random number generator. You can only generate the seed's first tensor using this function.";A=shape
+	if shared.opts.randn_source==_B:C=rng_philox.Generator(seed);return torch.asarray(C.randn(A),device=devices.device)
+	B=devices.cpu if shared.opts.randn_source==_C or devices.device.type==_D else devices.device;D=torch.Generator(B).manual_seed(int(seed));return torch.randn(A,device=B,generator=D).to(devices.device)
 def randn_like(x):
-    """Generate a tensor with random numbers from a normal distribution using the previously initialized genrator.
-
-    Use either randn() or manual_seed() to initialize the generator."""
-
-    if shared.opts.randn_source == "NV":
-        return torch.asarray(nv_rng.randn(x.shape), device=x.device, dtype=x.dtype)
-
-    if shared.opts.randn_source == "CPU" or x.device.type == 'mps':
-        return torch.randn_like(x, device=devices.cpu).to(x.device)
-
-    return torch.randn_like(x)
-
-
-def randn_without_seed(shape, generator=None):
-    """Generate a tensor with random numbers from a normal distribution using the previously initialized genrator.
-
-    Use either randn() or manual_seed() to initialize the generator."""
-
-    if shared.opts.randn_source == "NV":
-        return torch.asarray((generator or nv_rng).randn(shape), device=devices.device)
-
-    if shared.opts.randn_source == "CPU" or devices.device.type == 'mps':
-        return torch.randn(shape, device=devices.cpu, generator=generator).to(devices.device)
-
-    return torch.randn(shape, device=devices.device, generator=generator)
-
-
+	'Generate a tensor with random numbers from a normal distribution using the previously initialized genrator.\n\n    Use either randn() or manual_seed() to initialize the generator.'
+	if shared.opts.randn_source==_B:return torch.asarray(nv_rng.randn(x.shape),device=x.device,dtype=x.dtype)
+	if shared.opts.randn_source==_C or x.device.type==_D:return torch.randn_like(x,device=devices.cpu).to(x.device)
+	return torch.randn_like(x)
+def randn_without_seed(shape,generator=_A):
+	'Generate a tensor with random numbers from a normal distribution using the previously initialized genrator.\n\n    Use either randn() or manual_seed() to initialize the generator.';B=generator;A=shape
+	if shared.opts.randn_source==_B:return torch.asarray((B or nv_rng).randn(A),device=devices.device)
+	if shared.opts.randn_source==_C or devices.device.type==_D:return torch.randn(A,device=devices.cpu,generator=B).to(devices.device)
+	return torch.randn(A,device=devices.device,generator=B)
 def manual_seed(seed):
-    """Set up a global random number generator using the specified seed."""
-
-    if shared.opts.randn_source == "NV":
-        global nv_rng
-        nv_rng = rng_philox.Generator(seed)
-        return
-
-    torch.manual_seed(seed)
-
-
+	'Set up a global random number generator using the specified seed.'
+	if shared.opts.randn_source==_B:global nv_rng;nv_rng=rng_philox.Generator(seed);return
+	torch.manual_seed(seed)
 def create_generator(seed):
-    if shared.opts.randn_source == "NV":
-        return rng_philox.Generator(seed)
-
-    device = devices.cpu if shared.opts.randn_source == "CPU" or devices.device.type == 'mps' else devices.device
-    generator = torch.Generator(device).manual_seed(int(seed))
-    return generator
-
-
-# from https://discuss.pytorch.org/t/help-regarding-slerp-function-for-generative-model-sampling/32475/3
-def slerp(val, low, high):
-    low_norm = low/torch.norm(low, dim=1, keepdim=True)
-    high_norm = high/torch.norm(high, dim=1, keepdim=True)
-    dot = (low_norm*high_norm).sum(1)
-
-    if dot.mean() > 0.9995:
-        return low * val + high * (1 - val)
-
-    omega = torch.acos(dot)
-    so = torch.sin(omega)
-    res = (torch.sin((1.0-val)*omega)/so).unsqueeze(1)*low + (torch.sin(val*omega)/so).unsqueeze(1) * high
-    return res
-
-
+	if shared.opts.randn_source==_B:return rng_philox.Generator(seed)
+	A=devices.cpu if shared.opts.randn_source==_C or devices.device.type==_D else devices.device;B=torch.Generator(A).manual_seed(int(seed));return B
+def slerp(val,low,high):
+	C=high;B=low;A=val;G=B/torch.norm(B,dim=1,keepdim=True);H=C/torch.norm(C,dim=1,keepdim=True);E=(G*H).sum(1)
+	if E.mean()>.9995:return B*A+C*(1-A)
+	D=torch.acos(E);F=torch.sin(D);I=(torch.sin((1.-A)*D)/F).unsqueeze(1)*B+(torch.sin(A*D)/F).unsqueeze(1)*C;return I
 class ImageRNG:
-    def __init__(self, shape, seeds, subseeds=None, subseed_strength=0.0, seed_resize_from_h=0, seed_resize_from_w=0):
-        self.shape = tuple(map(int, shape))
-        self.seeds = seeds
-        self.subseeds = subseeds
-        self.subseed_strength = subseed_strength
-        self.seed_resize_from_h = seed_resize_from_h
-        self.seed_resize_from_w = seed_resize_from_w
-
-        self.generators = [create_generator(seed) for seed in seeds]
-
-        self.is_first = True
-
-    def first(self):
-        noise_shape = self.shape if self.seed_resize_from_h <= 0 or self.seed_resize_from_w <= 0 else (self.shape[0], self.seed_resize_from_h // 8, self.seed_resize_from_w // 8)
-
-        xs = []
-
-        for i, (seed, generator) in enumerate(zip(self.seeds, self.generators)):
-            subnoise = None
-            if self.subseeds is not None and self.subseed_strength != 0:
-                subseed = 0 if i >= len(self.subseeds) else self.subseeds[i]
-                subnoise = randn(subseed, noise_shape)
-
-            if noise_shape != self.shape:
-                noise = randn(seed, noise_shape)
-            else:
-                noise = randn(seed, self.shape, generator=generator)
-
-            if subnoise is not None:
-                noise = slerp(self.subseed_strength, noise, subnoise)
-
-            if noise_shape != self.shape:
-                x = randn(seed, self.shape, generator=generator)
-                dx = (self.shape[2] - noise_shape[2]) // 2
-                dy = (self.shape[1] - noise_shape[1]) // 2
-                w = noise_shape[2] if dx >= 0 else noise_shape[2] + 2 * dx
-                h = noise_shape[1] if dy >= 0 else noise_shape[1] + 2 * dy
-                tx = 0 if dx < 0 else dx
-                ty = 0 if dy < 0 else dy
-                dx = max(-dx, 0)
-                dy = max(-dy, 0)
-
-                x[:, ty:ty + h, tx:tx + w] = noise[:, dy:dy + h, dx:dx + w]
-                noise = x
-
-            xs.append(noise)
-
-        eta_noise_seed_delta = shared.opts.eta_noise_seed_delta or 0
-        if eta_noise_seed_delta:
-            self.generators = [create_generator(seed + eta_noise_seed_delta) for seed in self.seeds]
-
-        return torch.stack(xs).to(shared.device)
-
-    def next(self):
-        if self.is_first:
-            self.is_first = False
-            return self.first()
-
-        xs = []
-        for generator in self.generators:
-            x = randn_without_seed(self.shape, generator=generator)
-            xs.append(x)
-
-        return torch.stack(xs).to(shared.device)
-
-
-devices.randn = randn
-devices.randn_local = randn_local
-devices.randn_like = randn_like
-devices.randn_without_seed = randn_without_seed
-devices.manual_seed = manual_seed
+	def __init__(A,shape,seeds,subseeds=_A,subseed_strength=.0,seed_resize_from_h=0,seed_resize_from_w=0):B=seeds;A.shape=tuple(map(int,shape));A.seeds=B;A.subseeds=subseeds;A.subseed_strength=subseed_strength;A.seed_resize_from_h=seed_resize_from_h;A.seed_resize_from_w=seed_resize_from_w;A.generators=[create_generator(A)for A in B];A.is_first=True
+	def first(A):
+		B=A.shape if A.seed_resize_from_h<=0 or A.seed_resize_from_w<=0 else(A.shape[0],A.seed_resize_from_h//8,A.seed_resize_from_w//8);H=[]
+		for(I,(F,J))in enumerate(zip(A.seeds,A.generators)):
+			G=_A
+			if A.subseeds is not _A and A.subseed_strength!=0:Q=0 if I>=len(A.subseeds)else A.subseeds[I];G=randn(Q,B)
+			if B!=A.shape:E=randn(F,B)
+			else:E=randn(F,A.shape,generator=J)
+			if G is not _A:E=slerp(A.subseed_strength,E,G)
+			if B!=A.shape:K=randn(F,A.shape,generator=J);C=(A.shape[2]-B[2])//2;D=(A.shape[1]-B[1])//2;L=B[2]if C>=0 else B[2]+2*C;M=B[1]if D>=0 else B[1]+2*D;N=0 if C<0 else C;O=0 if D<0 else D;C=max(-C,0);D=max(-D,0);K[:,O:O+M,N:N+L]=E[:,D:D+M,C:C+L];E=K
+			H.append(E)
+		P=shared.opts.eta_noise_seed_delta or 0
+		if P:A.generators=[create_generator(A+P)for A in A.seeds]
+		return torch.stack(H).to(shared.device)
+	def next(A):
+		if A.is_first:A.is_first=False;return A.first()
+		B=[]
+		for C in A.generators:D=randn_without_seed(A.shape,generator=C);B.append(D)
+		return torch.stack(B).to(shared.device)
+devices.randn=randn
+devices.randn_local=randn_local
+devices.randn_like=randn_like
+devices.randn_without_seed=randn_without_seed
+devices.manual_seed=manual_seed

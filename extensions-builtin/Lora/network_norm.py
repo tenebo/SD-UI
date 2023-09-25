@@ -1,28 +1,14 @@
+_B='b_norm'
+_A='w_norm'
 import network
-
-
 class ModuleTypeNorm(network.ModuleType):
-    def create_module(self, net: network.Network, weights: network.NetworkWeights):
-        if all(x in weights.w for x in ["w_norm", "b_norm"]):
-            return NetworkModuleNorm(net, weights)
-
-        return None
-
-
+	def create_module(B,net,weights):
+		A=weights
+		if all(B in A.w for B in[_A,_B]):return NetworkModuleNorm(net,A)
 class NetworkModuleNorm(network.NetworkModule):
-    def __init__(self,  net: network.Network, weights: network.NetworkWeights):
-        super().__init__(net, weights)
-
-        self.w_norm = weights.w.get("w_norm")
-        self.b_norm = weights.w.get("b_norm")
-
-    def calc_updown(self, orig_weight):
-        output_shape = self.w_norm.shape
-        updown = self.w_norm.to(orig_weight.device, dtype=orig_weight.dtype)
-
-        if self.b_norm is not None:
-            ex_bias = self.b_norm.to(orig_weight.device, dtype=orig_weight.dtype)
-        else:
-            ex_bias = None
-
-        return self.finalize_updown(updown, orig_weight, output_shape, ex_bias)
+	def __init__(B,net,weights):A=weights;super().__init__(net,A);B.w_norm=A.w.get(_A);B.b_norm=A.w.get(_B)
+	def calc_updown(A,orig_weight):
+		B=orig_weight;D=A.w_norm.shape;E=A.w_norm.to(B.device,dtype=B.dtype)
+		if A.b_norm is not None:C=A.b_norm.to(B.device,dtype=B.dtype)
+		else:C=None
+		return A.finalize_updown(E,B,D,C)

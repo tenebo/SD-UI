@@ -1,445 +1,168 @@
-import base64
-import io
-import json
-import os
-import re
-
-import gradio as gr
+_L='Negative prompt'
+_K='override_settings_component'
+_J='init_img'
+_I='Hires resize-2'
+_H='Prompt'
+_G='fields'
+_F='Hires resize-1'
+_E='Size-2'
+_D='Size-1'
+_C='\n'
+_B=False
+_A=None
+import base64,io,json,os,re,gradio as gr
 from modules.paths import data_path
-from modules import shared, ui_tempdir, script_callbacks, processing
+from modules import shared,ui_tempdir,script_callbacks,processing
 from PIL import Image
-
-re_param_code = r'\s*([\w ]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
-re_param = re.compile(re_param_code)
-re_imagesize = re.compile(r"^(\d+)x(\d+)$")
-re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
-type_of_gr_update = type(gr.update())
-
-paste_fields = {}
-registered_param_bindings = []
-
-
+re_param_code='\\s*([\\w ]+):\\s*("(?:\\\\.|[^\\\\"])+"|[^,]*)(?:,|$)'
+re_param=re.compile(re_param_code)
+re_imagesize=re.compile('^(\\d+)x(\\d+)$')
+re_hypernet_hash=re.compile('\\(([0-9a-f]+)\\)$')
+type_of_gr_update=type(gr.update())
+paste_fields={}
+registered_param_bindings=[]
 class ParamBinding:
-    def __init__(self, paste_button, tabname, source_text_component=None, source_image_component=None, source_tabname=None, override_settings_component=None, paste_field_names=None):
-        self.paste_button = paste_button
-        self.tabname = tabname
-        self.source_text_component = source_text_component
-        self.source_image_component = source_image_component
-        self.source_tabname = source_tabname
-        self.override_settings_component = override_settings_component
-        self.paste_field_names = paste_field_names or []
-
-
-def reset():
-    paste_fields.clear()
-    registered_param_bindings.clear()
-
-
+	def __init__(A,paste_button,tabname,source_text_component=_A,source_image_component=_A,source_tabname=_A,override_settings_component=_A,paste_field_names=_A):A.paste_button=paste_button;A.tabname=tabname;A.source_text_component=source_text_component;A.source_image_component=source_image_component;A.source_tabname=source_tabname;A.override_settings_component=override_settings_component;A.paste_field_names=paste_field_names or[]
+def reset():paste_fields.clear();registered_param_bindings.clear()
 def quote(text):
-    if ',' not in str(text) and '\n' not in str(text) and ':' not in str(text):
-        return text
-
-    return json.dumps(text, ensure_ascii=False)
-
-
+	A=text
+	if','not in str(A)and _C not in str(A)and':'not in str(A):return A
+	return json.dumps(A,ensure_ascii=_B)
 def unquote(text):
-    if len(text) == 0 or text[0] != '"' or text[-1] != '"':
-        return text
-
-    try:
-        return json.loads(text)
-    except Exception:
-        return text
-
-
+	A=text
+	if len(A)==0 or A[0]!='"'or A[-1]!='"':return A
+	try:return json.loads(A)
+	except Exception:return A
 def image_from_url_text(filedata):
-    if filedata is None:
-        return None
-
-    if type(filedata) == list and filedata and type(filedata[0]) == dict and filedata[0].get("is_file", False):
-        filedata = filedata[0]
-
-    if type(filedata) == dict and filedata.get("is_file", False):
-        filename = filedata["name"]
-        is_in_right_dir = ui_tempdir.check_tmp_file(shared.demo, filename)
-        assert is_in_right_dir, 'trying to open image file outside of allowed directories'
-
-        filename = filename.rsplit('?', 1)[0]
-        return Image.open(filename)
-
-    if type(filedata) == list:
-        if len(filedata) == 0:
-            return None
-
-        filedata = filedata[0]
-
-    if filedata.startswith("data:image/png;base64,"):
-        filedata = filedata[len("data:image/png;base64,"):]
-
-    filedata = base64.decodebytes(filedata.encode('utf-8'))
-    image = Image.open(io.BytesIO(filedata))
-    return image
-
-
-def add_paste_fields(tabname, init_img, fields, override_settings_component=None):
-    paste_fields[tabname] = {"init_img": init_img, "fields": fields, "override_settings_component": override_settings_component}
-
-    # backwards compatibility for existing extensions
-    import modules.ui
-    if tabname == 'txt2img':
-        modules.ui.txt2img_paste_fields = fields
-    elif tabname == 'img2img':
-        modules.ui.img2img_paste_fields = fields
-
-
+	D='data:image/png;base64,';C='is_file';A=filedata
+	if A is _A:return
+	if type(A)==list and A and type(A[0])==dict and A[0].get(C,_B):A=A[0]
+	if type(A)==dict and A.get(C,_B):B=A['name'];E=ui_tempdir.check_tmp_file(shared.demo,B);assert E,'trying to open image file outside of allowed directories';B=B.rsplit('?',1)[0];return Image.open(B)
+	if type(A)==list:
+		if len(A)==0:return
+		A=A[0]
+	if A.startswith(D):A=A[len(D):]
+	A=base64.decodebytes(A.encode('utf-8'));F=Image.open(io.BytesIO(A));return F
+def add_paste_fields(tabname,init_img,fields,override_settings_component=_A):
+	B=fields;A=tabname;paste_fields[A]={_J:init_img,_G:B,_K:override_settings_component};import modules.ui
+	if A=='txt2img':modules.ui.txt2img_paste_fields=B
+	elif A=='img2img':modules.ui.img2img_paste_fields=B
 def create_buttons(tabs_list):
-    buttons = {}
-    for tab in tabs_list:
-        buttons[tab] = gr.Button(f"Send to {tab}", elem_id=f"{tab}_tab")
-    return buttons
-
-
-def bind_buttons(buttons, send_image, send_generate_info):
-    """old function for backwards compatibility; do not use this, use register_paste_params_button"""
-    for tabname, button in buttons.items():
-        source_text_component = send_generate_info if isinstance(send_generate_info, gr.components.Component) else None
-        source_tabname = send_generate_info if isinstance(send_generate_info, str) else None
-
-        register_paste_params_button(ParamBinding(paste_button=button, tabname=tabname, source_text_component=source_text_component, source_image_component=send_image, source_tabname=source_tabname))
-
-
-def register_paste_params_button(binding: ParamBinding):
-    registered_param_bindings.append(binding)
-
-
+	B={}
+	for A in tabs_list:B[A]=gr.Button(f"Send to {A}",elem_id=f"{A}_tab")
+	return B
+def bind_buttons(buttons,send_image,send_generate_info):
+	'old function for backwards compatibility; do not use this, use register_paste_params_button';A=send_generate_info
+	for(B,C)in buttons.items():D=A if isinstance(A,gr.components.Component)else _A;E=A if isinstance(A,str)else _A;register_paste_params_button(ParamBinding(paste_button=C,tabname=B,source_text_component=D,source_image_component=send_image,source_tabname=E))
+def register_paste_params_button(binding):registered_param_bindings.append(binding)
 def connect_paste_params_buttons():
-    binding: ParamBinding
-    for binding in registered_param_bindings:
-        destination_image_component = paste_fields[binding.tabname]["init_img"]
-        fields = paste_fields[binding.tabname]["fields"]
-        override_settings_component = binding.override_settings_component or paste_fields[binding.tabname]["override_settings_component"]
-
-        destination_width_component = next(iter([field for field, name in fields if name == "Size-1"] if fields else []), None)
-        destination_height_component = next(iter([field for field, name in fields if name == "Size-2"] if fields else []), None)
-
-        if binding.source_image_component and destination_image_component:
-            if isinstance(binding.source_image_component, gr.Gallery):
-                func = send_image_and_dimensions if destination_width_component else image_from_url_text
-                jsfunc = "extract_image_from_gallery"
-            else:
-                func = send_image_and_dimensions if destination_width_component else lambda x: x
-                jsfunc = None
-
-            binding.paste_button.click(
-                fn=func,
-                _js=jsfunc,
-                inputs=[binding.source_image_component],
-                outputs=[destination_image_component, destination_width_component, destination_height_component] if destination_width_component else [destination_image_component],
-                show_progress=False,
-            )
-
-        if binding.source_text_component is not None and fields is not None:
-            connect_paste(binding.paste_button, fields, binding.source_text_component, override_settings_component, binding.tabname)
-
-        if binding.source_tabname is not None and fields is not None:
-            paste_field_names = ['Prompt', 'Negative prompt', 'Steps', 'Face restoration'] + (["Seed"] if shared.opts.send_seed else []) + binding.paste_field_names
-            binding.paste_button.click(
-                fn=lambda *x: x,
-                inputs=[field for field, name in paste_fields[binding.source_tabname]["fields"] if name in paste_field_names],
-                outputs=[field for field, name in fields if name in paste_field_names],
-                show_progress=False,
-            )
-
-        binding.paste_button.click(
-            fn=None,
-            _js=f"switch_to_{binding.tabname}",
-            inputs=None,
-            outputs=None,
-            show_progress=False,
-        )
-
-
+	A:0
+	for A in registered_param_bindings:
+		D=paste_fields[A.tabname][_J];B=paste_fields[A.tabname][_G];H=A.override_settings_component or paste_fields[A.tabname][_K];C=next(iter([A for(A,B)in B if B==_D]if B else[]),_A);I=next(iter([A for(A,B)in B if B==_E]if B else[]),_A)
+		if A.source_image_component and D:
+			if isinstance(A.source_image_component,gr.Gallery):E=send_image_and_dimensions if C else image_from_url_text;F='extract_image_from_gallery'
+			else:E=send_image_and_dimensions if C else lambda x:x;F=_A
+			A.paste_button.click(fn=E,_js=F,inputs=[A.source_image_component],outputs=[D,C,I]if C else[D],show_progress=_B)
+		if A.source_text_component is not _A and B is not _A:connect_paste(A.paste_button,B,A.source_text_component,H,A.tabname)
+		if A.source_tabname is not _A and B is not _A:G=[_H,_L,'Steps','Face restoration']+(['Seed']if shared.opts.send_seed else[])+A.paste_field_names;A.paste_button.click(fn=lambda*A:A,inputs=[A for(A,B)in paste_fields[A.source_tabname][_G]if B in G],outputs=[A for(A,B)in B if B in G],show_progress=_B)
+		A.paste_button.click(fn=_A,_js=f"switch_to_{A.tabname}",inputs=_A,outputs=_A,show_progress=_B)
 def send_image_and_dimensions(x):
-    if isinstance(x, Image.Image):
-        img = x
-    else:
-        img = image_from_url_text(x)
-
-    if shared.opts.send_size and isinstance(img, Image.Image):
-        w = img.width
-        h = img.height
-    else:
-        w = gr.update()
-        h = gr.update()
-
-    return img, w, h
-
-
+	if isinstance(x,Image.Image):A=x
+	else:A=image_from_url_text(x)
+	if shared.opts.send_size and isinstance(A,Image.Image):B=A.width;C=A.height
+	else:B=gr.update();C=gr.update()
+	return A,B,C
 def restore_old_hires_fix_params(res):
-    """for infotexts that specify old First pass size parameter, convert it into
-    width, height, and hr scale"""
-
-    firstpass_width = res.get('First pass size-1', None)
-    firstpass_height = res.get('First pass size-2', None)
-
-    if shared.opts.use_old_hires_fix_width_height:
-        hires_width = int(res.get("Hires resize-1", 0))
-        hires_height = int(res.get("Hires resize-2", 0))
-
-        if hires_width and hires_height:
-            res['Size-1'] = hires_width
-            res['Size-2'] = hires_height
-            return
-
-    if firstpass_width is None or firstpass_height is None:
-        return
-
-    firstpass_width, firstpass_height = int(firstpass_width), int(firstpass_height)
-    width = int(res.get("Size-1", 512))
-    height = int(res.get("Size-2", 512))
-
-    if firstpass_width == 0 or firstpass_height == 0:
-        firstpass_width, firstpass_height = processing.old_hires_fix_first_pass_dimensions(width, height)
-
-    res['Size-1'] = firstpass_width
-    res['Size-2'] = firstpass_height
-    res['Hires resize-1'] = width
-    res['Hires resize-2'] = height
-
-
-def parse_generation_parameters(x: str):
-    """parses generation parameters string, the one you see in text field under the picture in UI:
-```
-girl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate
-Negative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing
-Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b
-```
-
-    returns a dict with field values
-    """
-
-    res = {}
-
-    prompt = ""
-    negative_prompt = ""
-
-    done_with_prompt = False
-
-    *lines, lastline = x.strip().split("\n")
-    if len(re_param.findall(lastline)) < 3:
-        lines.append(lastline)
-        lastline = ''
-
-    for line in lines:
-        line = line.strip()
-        if line.startswith("Negative prompt:"):
-            done_with_prompt = True
-            line = line[16:].strip()
-        if done_with_prompt:
-            negative_prompt += ("" if negative_prompt == "" else "\n") + line
-        else:
-            prompt += ("" if prompt == "" else "\n") + line
-
-    if shared.opts.infotext_styles != "Ignore":
-        found_styles, prompt, negative_prompt = shared.prompt_styles.extract_styles_from_prompt(prompt, negative_prompt)
-
-        if shared.opts.infotext_styles == "Apply":
-            res["Styles array"] = found_styles
-        elif shared.opts.infotext_styles == "Apply if any" and found_styles:
-            res["Styles array"] = found_styles
-
-    res["Prompt"] = prompt
-    res["Negative prompt"] = negative_prompt
-
-    for k, v in re_param.findall(lastline):
-        try:
-            if v[0] == '"' and v[-1] == '"':
-                v = unquote(v)
-
-            m = re_imagesize.match(v)
-            if m is not None:
-                res[f"{k}-1"] = m.group(1)
-                res[f"{k}-2"] = m.group(2)
-            else:
-                res[k] = v
-        except Exception:
-            print(f"Error parsing \"{k}: {v}\"")
-
-    # Missing CLIP skip means it was set to 1 (the default)
-    if "Clip skip" not in res:
-        res["Clip skip"] = "1"
-
-    hypernet = res.get("Hypernet", None)
-    if hypernet is not None:
-        res["Prompt"] += f"""<hypernet:{hypernet}:{res.get("Hypernet strength", "1.0")}>"""
-
-    if "Hires resize-1" not in res:
-        res["Hires resize-1"] = 0
-        res["Hires resize-2"] = 0
-
-    if "Hires sampler" not in res:
-        res["Hires sampler"] = "Use same sampler"
-
-    if "Hires checkpoint" not in res:
-        res["Hires checkpoint"] = "Use same checkpoint"
-
-    if "Hires prompt" not in res:
-        res["Hires prompt"] = ""
-
-    if "Hires negative prompt" not in res:
-        res["Hires negative prompt"] = ""
-
-    restore_old_hires_fix_params(res)
-
-    # Missing RNG means the default was set, which is GPU RNG
-    if "RNG" not in res:
-        res["RNG"] = "GPU"
-
-    if "Schedule type" not in res:
-        res["Schedule type"] = "Automatic"
-
-    if "Schedule max sigma" not in res:
-        res["Schedule max sigma"] = 0
-
-    if "Schedule min sigma" not in res:
-        res["Schedule min sigma"] = 0
-
-    if "Schedule rho" not in res:
-        res["Schedule rho"] = 0
-
-    if "VAE Encoder" not in res:
-        res["VAE Encoder"] = "Full"
-
-    if "VAE Decoder" not in res:
-        res["VAE Decoder"] = "Full"
-
-    return res
-
-
-infotext_to_setting_name_mapping = [
-
-]
-"""Mapping of infotext labels to setting names. Only left for backwards compatibility - use OptionInfo(..., infotext='...') instead.
-Example content:
-
-infotext_to_setting_name_mapping = [
-    ('Conditional mask weight', 'inpainting_mask_weight'),
-    ('Model hash', 'sd_model_checkpoint'),
-    ('ENSD', 'eta_noise_seed_delta'),
-    ('Schedule type', 'k_sched_type'),
-]
-"""
-
-
+	'for infotexts that specify old First pass size parameter, convert it into\n    width, height, and hr scale';A=res;B=A.get('First pass size-1',_A);C=A.get('First pass size-2',_A)
+	if shared.opts.use_old_hires_fix_width_height:
+		D=int(A.get(_F,0));E=int(A.get(_I,0))
+		if D and E:A[_D]=D;A[_E]=E;return
+	if B is _A or C is _A:return
+	B,C=int(B),int(C);F=int(A.get(_D,512));G=int(A.get(_E,512))
+	if B==0 or C==0:B,C=processing.old_hires_fix_first_pass_dimensions(F,G)
+	A[_D]=B;A[_E]=C;A[_F]=F;A[_I]=G
+def parse_generation_parameters(x):
+	"parses generation parameters string, the one you see in text field under the picture in UI:\n```\ngirl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate\nNegative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing\nSteps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b\n```\n\n    returns a dict with field values\n    ";a='VAE Decoder';Z='Full';Y='VAE Encoder';X='Schedule rho';W='Schedule min sigma';V='Schedule max sigma';U='Schedule type';T='RNG';S='Hires negative prompt';R='Hires prompt';Q='Hires checkpoint';P='Hires sampler';O='Clip skip';N='Styles array';B='';A={};E=B;F=B;K=_B;*L,G=x.strip().split(_C)
+	if len(re_param.findall(G))<3:L.append(G);G=B
+	for C in L:
+		C=C.strip()
+		if C.startswith('Negative prompt:'):K=True;C=C[16:].strip()
+		if K:F+=(B if F==B else _C)+C
+		else:E+=(B if E==B else _C)+C
+	if shared.opts.infotext_styles!='Ignore':
+		I,E,F=shared.prompt_styles.extract_styles_from_prompt(E,F)
+		if shared.opts.infotext_styles=='Apply':A[N]=I
+		elif shared.opts.infotext_styles=='Apply if any'and I:A[N]=I
+	A[_H]=E;A[_L]=F
+	for(H,D)in re_param.findall(G):
+		try:
+			if D[0]=='"'and D[-1]=='"':D=unquote(D)
+			J=re_imagesize.match(D)
+			if J is not _A:A[f"{H}-1"]=J.group(1);A[f"{H}-2"]=J.group(2)
+			else:A[H]=D
+		except Exception:print(f'Error parsing "{H}: {D}"')
+	if O not in A:A[O]='1'
+	M=A.get('Hypernet',_A)
+	if M is not _A:A[_H]+=f"<hypernet:{M}:{A.get('Hypernet strength','1.0')}>"
+	if _F not in A:A[_F]=0;A[_I]=0
+	if P not in A:A[P]='Use same sampler'
+	if Q not in A:A[Q]='Use same checkpoint'
+	if R not in A:A[R]=B
+	if S not in A:A[S]=B
+	restore_old_hires_fix_params(A)
+	if T not in A:A[T]='GPU'
+	if U not in A:A[U]='Automatic'
+	if V not in A:A[V]=0
+	if W not in A:A[W]=0
+	if X not in A:A[X]=0
+	if Y not in A:A[Y]=Z
+	if a not in A:A[a]=Z
+	return A
+infotext_to_setting_name_mapping=[]
+"Mapping of infotext labels to setting names. Only left for backwards compatibility - use OptionInfo(..., infotext='...') instead.\nExample content:\n\ninfotext_to_setting_name_mapping = [\n    ('Conditional mask weight', 'inpainting_mask_weight'),\n    ('Model hash', 'sd_model_checkpoint'),\n    ('ENSD', 'eta_noise_seed_delta'),\n    ('Schedule type', 'k_sched_type'),\n]\n"
 def create_override_settings_dict(text_pairs):
-    """creates processing's override_settings parameters from gradio's multiselect
-
-    Example input:
-        ['Clip skip: 2', 'Model hash: e6e99610c4', 'ENSD: 31337']
-
-    Example output:
-        {'CLIP_stop_at_last_layers': 2, 'sd_model_checkpoint': 'e6e99610c4', 'eta_noise_seed_delta': 31337}
-    """
-
-    res = {}
-
-    params = {}
-    for pair in text_pairs:
-        k, v = pair.split(":", maxsplit=1)
-
-        params[k] = v.strip()
-
-    mapping = [(info.infotext, k) for k, info in shared.opts.data_labels.items() if info.infotext]
-    for param_name, setting_name in mapping + infotext_to_setting_name_mapping:
-        value = params.get(param_name, None)
-
-        if value is None:
-            continue
-
-        res[setting_name] = shared.opts.cast_value(setting_name, value)
-
-    return res
-
-
-def connect_paste(button, paste_fields, input_comp, override_settings_component, tabname):
-    def paste_func(prompt):
-        if not prompt and not shared.cmd_opts.hide_ui_dir_config:
-            filename = os.path.join(data_path, "params.txt")
-            if os.path.exists(filename):
-                with open(filename, "r", encoding="utf8") as file:
-                    prompt = file.read()
-
-        params = parse_generation_parameters(prompt)
-        script_callbacks.infotext_pasted_callback(prompt, params)
-        res = []
-
-        for output, key in paste_fields:
-            if callable(key):
-                v = key(params)
-            else:
-                v = params.get(key, None)
-
-            if v is None:
-                res.append(gr.update())
-            elif isinstance(v, type_of_gr_update):
-                res.append(v)
-            else:
-                try:
-                    valtype = type(output.value)
-
-                    if valtype == bool and v == "False":
-                        val = False
-                    else:
-                        val = valtype(v)
-
-                    res.append(gr.update(value=val))
-                except Exception:
-                    res.append(gr.update())
-
-        return res
-
-    if override_settings_component is not None:
-        already_handled_fields = {key: 1 for _, key in paste_fields}
-
-        def paste_settings(params):
-            vals = {}
-
-            mapping = [(info.infotext, k) for k, info in shared.opts.data_labels.items() if info.infotext]
-            for param_name, setting_name in mapping + infotext_to_setting_name_mapping:
-                if param_name in already_handled_fields:
-                    continue
-
-                v = params.get(param_name, None)
-                if v is None:
-                    continue
-
-                if setting_name == "sd_model_checkpoint" and shared.opts.disable_weights_auto_swap:
-                    continue
-
-                v = shared.opts.cast_value(setting_name, v)
-                current_value = getattr(shared.opts, setting_name, None)
-
-                if v == current_value:
-                    continue
-
-                vals[param_name] = v
-
-            vals_pairs = [f"{k}: {v}" for k, v in vals.items()]
-
-            return gr.Dropdown.update(value=vals_pairs, choices=vals_pairs, visible=bool(vals_pairs))
-
-        paste_fields = paste_fields + [(override_settings_component, paste_settings)]
-
-    button.click(
-        fn=paste_func,
-        inputs=[input_comp],
-        outputs=[x[0] for x in paste_fields],
-        show_progress=False,
-    )
-    button.click(
-        fn=None,
-        _js=f"recalculate_prompts_{tabname}",
-        inputs=[],
-        outputs=[],
-        show_progress=False,
-    )
+	"creates processing's override_settings parameters from gradio's multiselect\n\n    Example input:\n        ['Clip skip: 2', 'Model hash: e6e99610c4', 'ENSD: 31337']\n\n    Example output:\n        {'CLIP_stop_at_last_layers': 2, 'sd_model_checkpoint': 'e6e99610c4', 'eta_noise_seed_delta': 31337}\n    ";A={};B={}
+	for E in text_pairs:F,G=E.split(':',maxsplit=1);B[F]=G.strip()
+	H=[(A.infotext,B)for(B,A)in shared.opts.data_labels.items()if A.infotext]
+	for(I,C)in H+infotext_to_setting_name_mapping:
+		D=B.get(I,_A)
+		if D is _A:continue
+		A[C]=shared.opts.cast_value(C,D)
+	return A
+def connect_paste(button,paste_fields,input_comp,override_settings_component,tabname):
+	C=override_settings_component;A=button;B=paste_fields
+	def D(prompt):
+		D=prompt
+		if not D and not shared.cmd_opts.hide_ui_dir_config:
+			G=os.path.join(data_path,'params.txt')
+			if os.path.exists(G):
+				with open(G,'r',encoding='utf8')as J:D=J.read()
+		E=parse_generation_parameters(D);script_callbacks.infotext_pasted_callback(D,E);C=[]
+		for(K,F)in B:
+			if callable(F):A=F(E)
+			else:A=E.get(F,_A)
+			if A is _A:C.append(gr.update())
+			elif isinstance(A,type_of_gr_update):C.append(A)
+			else:
+				try:
+					H=type(K.value)
+					if H==bool and A=='False':I=_B
+					else:I=H(A)
+					C.append(gr.update(value=I))
+				except Exception:C.append(gr.update())
+		return C
+	if C is not _A:
+		F={A:1 for(B,A)in B}
+		def E(params):
+			E={};G=[(A.infotext,B)for(B,A)in shared.opts.data_labels.items()if A.infotext]
+			for(B,C)in G+infotext_to_setting_name_mapping:
+				if B in F:continue
+				A=params.get(B,_A)
+				if A is _A:continue
+				if C=='sd_model_checkpoint'and shared.opts.disable_weights_auto_swap:continue
+				A=shared.opts.cast_value(C,A);H=getattr(shared.opts,C,_A)
+				if A==H:continue
+				E[B]=A
+			D=[f"{A}: {B}"for(A,B)in E.items()];return gr.Dropdown.update(value=D,choices=D,visible=bool(D))
+		B=B+[(C,E)]
+	A.click(fn=D,inputs=[input_comp],outputs=[A[0]for A in B],show_progress=_B);A.click(fn=_A,_js=f"recalculate_prompts_{tabname}",inputs=[],outputs=[],show_progress=_B)

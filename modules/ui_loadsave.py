@@ -1,227 +1,91 @@
-import json
-import os
-
-import gradio as gr
-
+_B=False
+_A=None
+import json,os,gradio as gr
 from modules import errors
 from modules.ui_components import ToolButton
-
-
-def radio_choices(comp):  # gradio 3.41 changes choices from list of values to list of pairs
-    return [x[0] if isinstance(x, tuple) else x for x in getattr(comp, 'choices', [])]
-
-
+def radio_choices(comp):return[A[0]if isinstance(A,tuple)else A for A in getattr(comp,'choices',[])]
 class UiLoadsave:
-    """allows saving and restoring default values for gradio components"""
-
-    def __init__(self, filename):
-        self.filename = filename
-        self.ui_settings = {}
-        self.component_mapping = {}
-        self.error_loading = False
-        self.finalized_ui = False
-
-        self.ui_defaults_view = None
-        self.ui_defaults_apply = None
-        self.ui_defaults_review = None
-
-        try:
-            if os.path.exists(self.filename):
-                self.ui_settings = self.read_from_file()
-        except Exception as e:
-            self.error_loading = True
-            errors.display(e, "loading settings")
-
-
-
-    def add_component(self, path, x):
-        """adds component to the registry of tracked components"""
-
-        assert not self.finalized_ui
-
-        def apply_field(obj, field, condition=None, init_field=None):
-            key = f"{path}/{field}"
-
-            if getattr(obj, 'custom_script_source', None) is not None:
-              key = f"customscript/{obj.custom_script_source}/{key}"
-
-            if getattr(obj, 'do_not_save_to_config', False):
-                return
-
-            saved_value = self.ui_settings.get(key, None)
-            if saved_value is None:
-                self.ui_settings[key] = getattr(obj, field)
-            elif condition and not condition(saved_value):
-                pass
-            else:
-                if isinstance(x, gr.Textbox) and field == 'value':  # due to an undesirable behavior of gr.Textbox, if you give it an int value instead of str, everything dies
-                    saved_value = str(saved_value)
-                elif isinstance(x, gr.Number) and field == 'value':
-                    try:
-                        saved_value = float(saved_value)
-                    except ValueError:
-                        return
-
-                setattr(obj, field, saved_value)
-                if init_field is not None:
-                    init_field(saved_value)
-
-            if field == 'value' and key not in self.component_mapping:
-                self.component_mapping[key] = x
-
-        if type(x) in [gr.Slider, gr.Radio, gr.Checkbox, gr.Textbox, gr.Number, gr.Dropdown, ToolButton, gr.Button] and x.visible:
-            apply_field(x, 'visible')
-
-        if type(x) == gr.Slider:
-            apply_field(x, 'value')
-            apply_field(x, 'minimum')
-            apply_field(x, 'maximum')
-            apply_field(x, 'step')
-
-        if type(x) == gr.Radio:
-            apply_field(x, 'value', lambda val: val in radio_choices(x))
-
-        if type(x) == gr.Checkbox:
-            apply_field(x, 'value')
-
-        if type(x) == gr.Textbox:
-            apply_field(x, 'value')
-
-        if type(x) == gr.Number:
-            apply_field(x, 'value')
-
-        if type(x) == gr.Dropdown:
-            def check_dropdown(val):
-                choices = radio_choices(x)
-                if getattr(x, 'multiselect', False):
-                    return all(value in choices for value in val)
-                else:
-                    return val in choices
-
-            apply_field(x, 'value', check_dropdown, getattr(x, 'init_field', None))
-
-        def check_tab_id(tab_id):
-            tab_items = list(filter(lambda e: isinstance(e, gr.TabItem), x.children))
-            if type(tab_id) == str:
-                tab_ids = [t.id for t in tab_items]
-                return tab_id in tab_ids
-            elif type(tab_id) == int:
-                return 0 <= tab_id < len(tab_items)
-            else:
-                return False
-
-        if type(x) == gr.Tabs:
-            apply_field(x, 'selected', check_tab_id)
-
-    def add_block(self, x, path=""):
-        """adds all components inside a gradio block x to the registry of tracked components"""
-
-        if hasattr(x, 'children'):
-            if isinstance(x, gr.Tabs) and x.elem_id is not None:
-                # Tabs element can't have a label, have to use elem_id instead
-                self.add_component(f"{path}/Tabs@{x.elem_id}", x)
-            for c in x.children:
-                self.add_block(c, path)
-        elif x.label is not None:
-            self.add_component(f"{path}/{x.label}", x)
-        elif isinstance(x, gr.Button) and x.value is not None:
-            self.add_component(f"{path}/{x.value}", x)
-
-    def read_from_file(self):
-        with open(self.filename, "r", encoding="utf8") as file:
-            return json.load(file)
-
-    def write_to_file(self, current_ui_settings):
-        with open(self.filename, "w", encoding="utf8") as file:
-            json.dump(current_ui_settings, file, indent=4)
-
-    def dump_defaults(self):
-        """saves default values to a file unless tjhe file is present and there was an error loading default values at start"""
-
-        if self.error_loading and os.path.exists(self.filename):
-            return
-
-        self.write_to_file(self.ui_settings)
-
-    def iter_changes(self, current_ui_settings, values):
-        """
-        given a dictionary with defaults from a file and current values from gradio elements, returns
-        an iterator over tuples of values that are not the same between the file and the current;
-        tuple contents are: path, old value, new value
-        """
-
-        for (path, component), new_value in zip(self.component_mapping.items(), values):
-            old_value = current_ui_settings.get(path)
-
-            choices = radio_choices(component)
-            if isinstance(new_value, int) and choices:
-                if new_value >= len(choices):
-                    continue
-
-                new_value = choices[new_value]
-                if isinstance(new_value, tuple):
-                    new_value = new_value[0]
-
-            if new_value == old_value:
-                continue
-
-            if old_value is None and new_value == '' or new_value == []:
-                continue
-
-            yield path, old_value, new_value
-
-    def ui_view(self, *values):
-        text = ["<table><thead><tr><th>Path</th><th>Old value</th><th>New value</th></thead><tbody>"]
-
-        for path, old_value, new_value in self.iter_changes(self.read_from_file(), values):
-            if old_value is None:
-                old_value = "<span class='ui-defaults-none'>None</span>"
-
-            text.append(f"<tr><td>{path}</td><td>{old_value}</td><td>{new_value}</td></tr>")
-
-        if len(text) == 1:
-            text.append("<tr><td colspan=3>No changes</td></tr>")
-
-        text.append("</tbody>")
-        return "".join(text)
-
-    def ui_apply(self, *values):
-        num_changed = 0
-
-        current_ui_settings = self.read_from_file()
-
-        for path, _, new_value in self.iter_changes(current_ui_settings.copy(), values):
-            num_changed += 1
-            current_ui_settings[path] = new_value
-
-        if num_changed == 0:
-            return "No changes."
-
-        self.write_to_file(current_ui_settings)
-
-        return f"Wrote {num_changed} changes."
-
-    def create_ui(self):
-        """creates ui elements for editing defaults UI, without adding any logic to them"""
-
-        gr.HTML(
-            f"This page allows you to change default values in UI elements on other tabs.<br />"
-            f"Make your changes, press 'View changes' to review the changed default values,<br />"
-            f"then press 'Apply' to write them to {self.filename}.<br />"
-            f"New defaults will apply after you restart the UI.<br />"
-        )
-
-        with gr.Row():
-            self.ui_defaults_view = gr.Button(value='View changes', elem_id="ui_defaults_view", variant="secondary")
-            self.ui_defaults_apply = gr.Button(value='Apply', elem_id="ui_defaults_apply", variant="primary")
-
-        self.ui_defaults_review = gr.HTML("")
-
-    def setup_ui(self):
-        """adds logic to elements created with create_ui; all add_block class must be made before this"""
-
-        assert not self.finalized_ui
-        self.finalized_ui = True
-
-        self.ui_defaults_view.click(fn=self.ui_view, inputs=list(self.component_mapping.values()), outputs=[self.ui_defaults_review])
-        self.ui_defaults_apply.click(fn=self.ui_apply, inputs=list(self.component_mapping.values()), outputs=[self.ui_defaults_review])
+	'allows saving and restoring default values for gradio components'
+	def __init__(A,filename):
+		A.filename=filename;A.ui_settings={};A.component_mapping={};A.error_loading=_B;A.finalized_ui=_B;A.ui_defaults_view=_A;A.ui_defaults_apply=_A;A.ui_defaults_review=_A
+		try:
+			if os.path.exists(A.filename):A.ui_settings=A.read_from_file()
+		except Exception as B:A.error_loading=True;errors.display(B,'loading settings')
+	def add_component(E,path,x):
+		'adds component to the registry of tracked components';B='value';assert not E.finalized_ui
+		def A(obj,field,condition=_A,init_field=_A):
+			H=init_field;G=condition;F=obj;C=field;D=f"{path}/{C}"
+			if getattr(F,'custom_script_source',_A)is not _A:D=f"customscript/{F.custom_script_source}/{D}"
+			if getattr(F,'do_not_save_to_config',_B):return
+			A=E.ui_settings.get(D,_A)
+			if A is _A:E.ui_settings[D]=getattr(F,C)
+			elif G and not G(A):0
+			else:
+				if isinstance(x,gr.Textbox)and C==B:A=str(A)
+				elif isinstance(x,gr.Number)and C==B:
+					try:A=float(A)
+					except ValueError:return
+				setattr(F,C,A)
+				if H is not _A:H(A)
+			if C==B and D not in E.component_mapping:E.component_mapping[D]=x
+		if type(x)in[gr.Slider,gr.Radio,gr.Checkbox,gr.Textbox,gr.Number,gr.Dropdown,ToolButton,gr.Button]and x.visible:A(x,'visible')
+		if type(x)==gr.Slider:A(x,B);A(x,'minimum');A(x,'maximum');A(x,'step')
+		if type(x)==gr.Radio:A(x,B,lambda val:val in radio_choices(x))
+		if type(x)==gr.Checkbox:A(x,B)
+		if type(x)==gr.Textbox:A(x,B)
+		if type(x)==gr.Number:A(x,B)
+		if type(x)==gr.Dropdown:
+			def C(val):
+				A=radio_choices(x)
+				if getattr(x,'multiselect',_B):return all(B in A for B in val)
+				else:return val in A
+			A(x,B,C,getattr(x,'init_field',_A))
+		def D(tab_id):
+			A=tab_id;B=list(filter(lambda e:isinstance(e,gr.TabItem),x.children))
+			if type(A)==str:C=[A.id for A in B];return A in C
+			elif type(A)==int:return 0<=A<len(B)
+			else:return _B
+		if type(x)==gr.Tabs:A(x,'selected',D)
+	def add_block(A,x,path=''):
+		'adds all components inside a gradio block x to the registry of tracked components';B=path
+		if hasattr(x,'children'):
+			if isinstance(x,gr.Tabs)and x.elem_id is not _A:A.add_component(f"{B}/Tabs@{x.elem_id}",x)
+			for C in x.children:A.add_block(C,B)
+		elif x.label is not _A:A.add_component(f"{B}/{x.label}",x)
+		elif isinstance(x,gr.Button)and x.value is not _A:A.add_component(f"{B}/{x.value}",x)
+	def read_from_file(A):
+		with open(A.filename,'r',encoding='utf8')as B:return json.load(B)
+	def write_to_file(A,current_ui_settings):
+		with open(A.filename,'w',encoding='utf8')as B:json.dump(current_ui_settings,B,indent=4)
+	def dump_defaults(A):
+		'saves default values to a file unless tjhe file is present and there was an error loading default values at start'
+		if A.error_loading and os.path.exists(A.filename):return
+		A.write_to_file(A.ui_settings)
+	def iter_changes(E,current_ui_settings,values):
+		'\n        given a dictionary with defaults from a file and current values from gradio elements, returns\n        an iterator over tuples of values that are not the same between the file and the current;\n        tuple contents are: path, old value, new value\n        '
+		for((D,F),A)in zip(E.component_mapping.items(),values):
+			B=current_ui_settings.get(D);C=radio_choices(F)
+			if isinstance(A,int)and C:
+				if A>=len(C):continue
+				A=C[A]
+				if isinstance(A,tuple):A=A[0]
+			if A==B:continue
+			if B is _A and A==''or A==[]:continue
+			yield(D,B,A)
+	def ui_view(C,*D):
+		A=['<table><thead><tr><th>Path</th><th>Old value</th><th>New value</th></thead><tbody>']
+		for(E,B,F)in C.iter_changes(C.read_from_file(),D):
+			if B is _A:B="<span class='ui-defaults-none'>None</span>"
+			A.append(f"<tr><td>{E}</td><td>{B}</td><td>{F}</td></tr>")
+		if len(A)==1:A.append('<tr><td colspan=3>No changes</td></tr>')
+		A.append('</tbody>');return''.join(A)
+	def ui_apply(A,*D):
+		B=0;C=A.read_from_file()
+		for(E,G,F)in A.iter_changes(C.copy(),D):B+=1;C[E]=F
+		if B==0:return'No changes.'
+		A.write_to_file(C);return f"Wrote {B} changes."
+	def create_ui(A):
+		'creates ui elements for editing defaults UI, without adding any logic to them';gr.HTML(f"This page allows you to change default values in UI elements on other tabs.<br />Make your changes, press 'View changes' to review the changed default values,<br />then press 'Apply' to write them to {A.filename}.<br />New defaults will apply after you restart the UI.<br />")
+		with gr.Row():A.ui_defaults_view=gr.Button(value='View changes',elem_id='ui_defaults_view',variant='secondary');A.ui_defaults_apply=gr.Button(value='Apply',elem_id='ui_defaults_apply',variant='primary')
+		A.ui_defaults_review=gr.HTML('')
+	def setup_ui(A):'adds logic to elements created with create_ui; all add_block class must be made before this';assert not A.finalized_ui;A.finalized_ui=True;A.ui_defaults_view.click(fn=A.ui_view,inputs=list(A.component_mapping.values()),outputs=[A.ui_defaults_review]);A.ui_defaults_apply.click(fn=A.ui_apply,inputs=list(A.component_mapping.values()),outputs=[A.ui_defaults_review])
